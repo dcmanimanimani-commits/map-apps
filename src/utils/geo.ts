@@ -1,10 +1,11 @@
-import { geoPath, geoMercator } from 'd3-geo';
+import { geoCentroid, geoPath, geoMercator } from 'd3-geo';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
-import { trimMainlandForProjection, type PrefectureFeature } from './geoTransform';
+import { simplifyOkinawaForInset, trimMainlandForProjection, type PrefectureFeature } from './geoTransform';
 
 export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';
+export const OKINAWA_CLIP_ID = 'okinawa-clip';
 
 /** L字区切りの角（画面右下の沖縄エリア） */
 export function getOkinawaCorner(width: number, height: number) {
@@ -56,17 +57,30 @@ export function createOkinawaInsetPathGenerator(
   width: number,
   height: number,
 ) {
+  const simplified = simplifyOkinawaForInset(okinawa);
   const innerLeft = layout.cornerX + layout.innerPad;
   const innerTop = layout.cornerY + layout.innerPad;
   const innerRight = width - layout.innerPad;
   const innerBottom = height - layout.innerPad;
+  const centerX = (innerLeft + innerRight) / 2;
+  const centerY = (innerTop + innerBottom) / 2;
 
-  return geoPath(
-    geoMercator().fitExtent(
-      [[innerLeft, innerTop], [innerRight, innerBottom]],
-      okinawa,
-    ),
+  const projection = geoMercator().fitExtent(
+    [[innerLeft, innerTop], [innerRight, innerBottom]],
+    simplified,
   );
+
+  const OKINAWA_SCALE = 0.25;
+  projection.scale(projection.scale() * OKINAWA_SCALE);
+
+  const centroid = geoCentroid(simplified);
+  const projected = projection(centroid);
+  if (projected) {
+    const [tx, ty] = projection.translate();
+    projection.translate([tx + (centerX - projected[0]), ty + (centerY - projected[1])]);
+  }
+
+  return geoPath(projection);
 }
 
 export function getFeatureKanji(feature: Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>): string {

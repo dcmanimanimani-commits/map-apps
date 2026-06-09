@@ -69,6 +69,61 @@ export function trimMainlandForProjection(mainland: JapanGeoJSON): JapanGeoJSON 
   };
 }
 
+function polygonBoundingArea(polygon: Position[][]): number {
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+
+  for (const ring of polygon) {
+    for (const [lon, lat] of ring) {
+      minLon = Math.min(minLon, lon);
+      maxLon = Math.max(maxLon, lon);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    }
+  }
+
+  return (maxLon - minLon) * (maxLat - minLat);
+}
+
+function polygonCentroid(polygon: Position[][]): [number, number] {
+  const ring = polygon[0];
+  let sumLon = 0;
+  let sumLat = 0;
+  for (const [lon, lat] of ring) {
+    sumLon += lon;
+    sumLat += lat;
+  }
+  return [sumLon / ring.length, sumLat / ring.length];
+}
+
+/** インセット用：右上に見える大きな島1つだけ（沖縄本島）を枠中央で表示 */
+export function simplifyOkinawaForInset(feature: PrefectureFeature): PrefectureFeature {
+  if (feature.geometry.type !== 'MultiPolygon') return feature;
+
+  const candidates = [...feature.geometry.coordinates]
+    .map((polygon) => ({
+      polygon,
+      area: polygonBoundingArea(polygon),
+      centroid: polygonCentroid(polygon),
+    }))
+    .sort((a, b) => b.area - a.area)
+    .slice(0, 2);
+
+  if (candidates.length === 0) return feature;
+
+  // 2島表示時の右上側（北東）の島を採用
+  const chosen = [...candidates].sort(
+    (a, b) => (b.centroid[0] + b.centroid[1]) - (a.centroid[0] + a.centroid[1]),
+  )[0];
+
+  return {
+    ...feature,
+    geometry: { type: 'Polygon', coordinates: chosen.polygon },
+  };
+}
+
 export function splitMainlandAndOkinawa(geo: JapanGeoJSON): {
   mainland: JapanGeoJSON;
   okinawa: PrefectureFeature | null;

@@ -2,14 +2,15 @@ import { useMemo, useRef } from 'react';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
-import { getRegionColor, getShortKanji, prefectureByKanji } from '../data/prefectures';
-import { OKINAWA_KANJI, splitMainlandAndOkinawa } from '../utils/geoTransform';
+import { getRegionColor, prefectureByKanji } from '../data/prefectures';
+import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
 import {
   createMainlandPathGenerator,
   createOkinawaInsetPathGenerator,
   getFeatureKanji,
   getOkinawaInsetLayout,
   MAINLAND_CLIP_ID,
+  OKINAWA_CLIP_ID,
   OCEAN_GRADIENT_ID,
 } from '../utils/geo';
 
@@ -20,37 +21,6 @@ interface JapanMapProps {
   wrongKanji?: string | null;
   onPrefectureClick?: (kanji: string) => void;
   interactive?: boolean;
-  showLabels?: boolean;
-}
-
-function MapLabel({
-  x,
-  y,
-  text,
-  fontSize,
-}: {
-  x: number;
-  y: number;
-  text: string;
-  fontSize: number;
-}) {
-  return (
-    <text
-      x={x}
-      y={y}
-      fontSize={fontSize}
-      fill="#ffffff"
-      stroke="#000000"
-      strokeWidth={fontSize * 0.28}
-      paintOrder="stroke"
-      textAnchor="middle"
-      dominantBaseline="middle"
-      pointerEvents="none"
-      fontWeight="700"
-    >
-      {text}
-    </text>
-  );
 }
 
 export function JapanMap({
@@ -60,14 +30,12 @@ export function JapanMap({
   wrongKanji = null,
   onPrefectureClick,
   interactive = true,
-  showLabels = true,
 }: JapanMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { width, height } = useMapSize(containerRef);
 
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
   const strokeWidth = Math.max(1.2, width * 0.0025);
-  const labelSize = Math.max(8, Math.min(13, width * 0.018));
 
   const mainlandPaths = useMemo(() => {
     const pathGen = createMainlandPathGenerator(mainland, width, height);
@@ -75,15 +43,10 @@ export function JapanMap({
       const kanji = getFeatureKanji(feature as Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>);
       const d = pathGen(feature as Feature<Geometry, GeoJsonProperties>) ?? null;
       const pref = prefectureByKanji.get(kanji);
-      const centroid = d
-        ? (pathGen.centroid(feature as Feature<Geometry, GeoJsonProperties>) as [number, number])
-        : null;
       return {
         kanji,
         d,
         color: pref ? getRegionColor(pref.region) : '#888',
-        shortName: pref ? getShortKanji(pref.kanji) : '',
-        centroid,
       };
     });
   }, [mainland, width, height]);
@@ -91,10 +54,9 @@ export function JapanMap({
   const okinawaInset = useMemo(() => {
     if (!okinawa) return null;
     const layout = getOkinawaInsetLayout(width, height);
+    const simplified = simplifyOkinawaForInset(okinawa);
     const pathGen = createOkinawaInsetPathGenerator(okinawa, layout, width, height);
-    const d = pathGen(okinawa) ?? null;
-    const centroid = d ? (pathGen.centroid(okinawa) as [number, number]) : null;
-    return { d, layout, centroid };
+    return { d: pathGen(simplified) ?? null, layout };
   }, [okinawa, width, height]);
 
   function getFill(kanji: string, baseColor: string): string {
@@ -146,6 +108,16 @@ export function JapanMap({
           <clipPath id={MAINLAND_CLIP_ID}>
             <rect x={0} y={0} width={width} height={height} />
           </clipPath>
+          {okinawaInset && (
+            <clipPath id={OKINAWA_CLIP_ID}>
+              <rect
+                x={okinawaInset.layout.cornerX}
+                y={okinawaInset.layout.cornerY}
+                width={width - okinawaInset.layout.cornerX}
+                height={height - okinawaInset.layout.cornerY}
+              />
+            </clipPath>
+          )}
         </defs>
         <rect width={width} height={height} fill={`url(#${OCEAN_GRADIENT_ID})`} rx="8" />
 
@@ -156,8 +128,7 @@ export function JapanMap({
         </g>
 
         {okinawaInset && (
-          <g className="okinawa-inset-layer">
-            {/* 参考地図スタイルのL字区切り線 */}
+          <g className="okinawa-inset-layer" clipPath={`url(#${OKINAWA_CLIP_ID})`}>
             <path
               d={`M ${okinawaInset.layout.cornerX} ${height} L ${okinawaInset.layout.cornerX} ${okinawaInset.layout.cornerY} L ${width} ${okinawaInset.layout.cornerY}`}
               fill="none"
@@ -172,31 +143,8 @@ export function JapanMap({
                 okinawaInset.d,
                 getRegionColor('沖縄'),
               )}
-
-            {showLabels && okinawaInset.centroid && (
-              <MapLabel
-                x={okinawaInset.centroid[0]}
-                y={okinawaInset.centroid[1]}
-                text="沖縄"
-                fontSize={labelSize}
-              />
-            )}
           </g>
         )}
-
-        {showLabels &&
-          mainlandPaths.map(({ kanji, d, shortName, centroid }) => {
-            if (!d || !centroid || !shortName) return null;
-            return (
-              <MapLabel
-                key={`label-${kanji}`}
-                x={centroid[0]}
-                y={centroid[1]}
-                text={shortName}
-                fontSize={labelSize}
-              />
-            );
-          })}
       </svg>
     </div>
   );
