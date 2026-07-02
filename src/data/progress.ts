@@ -31,15 +31,35 @@ export function loadProgress(): PlayerProgress {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const progress = JSON.parse(raw) as PlayerProgress;
+      let progress = JSON.parse(raw) as PlayerProgress;
+      let changed = false;
+
       if (progress.masteredRegions.includes('okinawa') && !progress.masteredRegions.includes('kyushu')) {
-        const masteredRegions = [
-          ...progress.masteredRegions.filter((k) => k !== 'okinawa'),
-          'kyushu',
-        ];
-        const updated = { ...progress, masteredRegions };
-        saveProgress(updated);
-        return updated;
+        progress = {
+          ...progress,
+          masteredRegions: [
+            ...progress.masteredRegions.filter((k) => k !== 'okinawa'),
+            'kyushu',
+          ],
+        };
+        changed = true;
+      }
+
+      const chubuSubs = ['chubu:hokuriku', 'chubu:koshinetsu', 'chubu:tokai'];
+      const hasAllChubuSubs = chubuSubs.every((k) => progress.masteredRegions.includes(k));
+      const hasChubuSubs = progress.masteredRegions.some((k) => chubuSubs.includes(k));
+
+      if (hasChubuSubs || hasAllChubuSubs) {
+        let masteredRegions = progress.masteredRegions.filter((k) => !chubuSubs.includes(k));
+        if (hasAllChubuSubs && !masteredRegions.includes('chubu')) {
+          masteredRegions = [...masteredRegions, 'chubu'];
+        }
+        progress = { ...progress, masteredRegions };
+        changed = true;
+      }
+
+      if (changed) {
+        saveProgress(progress);
       }
       return progress;
     }
@@ -80,8 +100,7 @@ export function masterRegion(regionId: string, subRegionId?: string): PlayerProg
 export function areAllRegionsMastered(): boolean {
   const progress = loadProgress();
   const requiredKeys = [
-    'hokkaido', 'tohoku', 'kanto',
-    'chubu:hokuriku', 'chubu:koshinetsu', 'chubu:tokai',
+    'hokkaido', 'tohoku', 'kanto', 'chubu',
     'kinki', 'chugoku', 'shikoku', 'kyushu',
   ];
   return requiredKeys.every((k) => progress.masteredRegions.includes(k));

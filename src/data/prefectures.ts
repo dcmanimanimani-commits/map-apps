@@ -112,17 +112,7 @@ export function getRandomPrefecture(exclude?: Prefecture, pool = prefectures): P
   return list[Math.floor(Math.random() * list.length)];
 }
 
-export function getPrefecturesByRegion(regionId: string, subRegionId?: string): Prefecture[] {
-  if (regionId === 'chubu' && subRegionId) {
-    const subMap: Record<string, string> = {
-      hokuriku: '北陸',
-      koshinetsu: '甲信越',
-      tokai: '東海',
-    };
-    const label = subMap[subRegionId];
-    return prefectures.filter((p) => p.region === '中部' && p.subRegion === label);
-  }
-
+export function getPrefecturesByRegion(regionId: string): Prefecture[] {
   const regionMap: Record<string, string> = {
     hokkaido: '北海道',
     tohoku: '東北',

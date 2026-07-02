@@ -28,7 +28,7 @@ const quizModes = [
 function App() {
   const { geo, loading, error } = useJapanGeo();
   const [screen, setScreen] = useState<Screen>('home');
-  const [studyRegion, setStudyRegion] = useState<{ id: string; sub?: string } | null>(null);
+  const [studyRegion, setStudyRegion] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -53,8 +53,8 @@ function App() {
     return (
       <RegionSelect
         onBack={() => setScreen('home')}
-        onSelect={(id, sub) => {
-          setStudyRegion({ id, sub });
+        onSelect={(id) => {
+          setStudyRegion(id);
           setScreen('region-study');
         }}
       />
@@ -65,8 +65,7 @@ function App() {
     return (
       <RegionStudy
         geo={geo}
-        regionId={studyRegion.id}
-        subRegionId={studyRegion.sub}
+        regionId={studyRegion}
         onBack={() => setScreen('regions')}
         onMastered={() => setScreen('regions')}
       />

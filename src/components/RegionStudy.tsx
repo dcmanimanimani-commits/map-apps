@@ -10,7 +10,6 @@ import { PlayerStatus } from './PlayerStatus';
 interface RegionStudyProps {
   geo: JapanGeoJSON;
   regionId: string;
-  subRegionId?: string;
   onBack: () => void;
   onMastered: () => void;
 }
@@ -19,16 +18,14 @@ type Phase = 'learn' | 'quiz' | 'clear';
 
 const QUIZ_GOAL = 8;
 
-export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: RegionStudyProps) {
+export function RegionStudy({ geo, regionId, onBack, onMastered }: RegionStudyProps) {
   const region = getStudyRegion(regionId);
   const prefs = useMemo(
-    () => getPrefecturesByRegion(regionId, subRegionId),
-    [regionId, subRegionId],
+    () => getPrefecturesByRegion(regionId),
+    [regionId],
   );
 
-  const regionLabel = subRegionId
-    ? region?.subRegions?.find((s) => s.id === subRegionId)?.name ?? ''
-    : region?.name ?? '';
+  const regionLabel = region?.name ?? '';
 
   const [phase, setPhase] = useState<Phase>('learn');
   const [selectedKanji, setSelectedKanji] = useState<string | null>(null);
@@ -86,7 +83,7 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
     setTimeout(() => {
       if (newAnswered >= QUIZ_GOAL) {
         if (newScore >= 6) {
-          const updated = masterRegion(regionId, subRegionId);
+          const updated = masterRegion(regionId);
           setNewTitle(updated.title);
           setPhase('clear');
         } else {

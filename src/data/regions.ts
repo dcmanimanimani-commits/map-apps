@@ -4,7 +4,6 @@ export interface StudyRegion {
   emoji: string;
   color: string;
   description: string;
-  subRegions?: { id: string; name: string; emoji: string }[];
 }
 
 export const studyRegions: StudyRegion[] = [
@@ -34,12 +33,7 @@ export const studyRegions: StudyRegion[] = [
     name: '中部地方',
     emoji: '🏔️',
     color: '#7cb342',
-    description: '日本のまんなか！3つのエリアに分かれるよ',
-    subRegions: [
-      { id: 'hokuriku', name: '北陸', emoji: '🦀' },
-      { id: 'koshinetsu', name: '甲信越', emoji: '🍇' },
-      { id: 'tokai', name: '東海', emoji: '🍵' },
-    ],
+    description: '日本のまんなか！',
   },
   {
     id: 'kinki',
