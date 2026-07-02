@@ -13,7 +13,7 @@ export const TITLES: { minLevel: number; title: string }[] = [
   { minLevel: 1, title: 'うんぴくんレベル' },
   { minLevel: 2, title: 'だんごむしレベル' },
   { minLevel: 3, title: 'てんとうむしちゃんレベル' },
-  { minLevel: 4, title: '赤ちゃんハムスターレベル' },
+  { minLevel: 4, title: '赤ちゃんカタツムリレベル' },
   { minLevel: 5, title: 'ケガしたハムスターレベル' },
   { minLevel: 6, title: 'おばあちゃん猫レベル' },
   { minLevel: 7, title: 'むし歯だらけのライオンレベル' },
