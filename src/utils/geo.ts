@@ -98,6 +98,7 @@ export function createOkinawaInsetPathGenerator(
   layout: OkinawaInsetLayout,
   width: number,
   height: number,
+  scale = 0.25,
 ) {
   const simplified = simplifyOkinawaForInset(okinawa);
   const innerLeft = layout.cornerX + layout.innerPad;
@@ -112,8 +113,7 @@ export function createOkinawaInsetPathGenerator(
     simplified,
   );
 
-  const OKINAWA_SCALE = 0.25;
-  projection.scale(projection.scale() * OKINAWA_SCALE);
+  projection.scale(projection.scale() * scale);
 
   const centroid = geoCentroid(simplified);
   const projected = projection(centroid);
@@ -124,6 +124,10 @@ export function createOkinawaInsetPathGenerator(
 
   return geoPath(projection);
 }
+
+/** 地方学習時の沖縄インセット（本島＋沖縄） */
+export const OKINAWA_INSET_SCALE_FULL = 0.25;
+export const OKINAWA_INSET_SCALE_REGION = 0.78;
 
 export function getFeatureKanji(feature: Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>): string {
   return feature.properties?.nam_ja ?? '';
