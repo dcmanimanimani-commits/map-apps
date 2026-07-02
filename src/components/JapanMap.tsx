@@ -50,9 +50,8 @@ export function JapanMap({
   const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
   const strokeWidth = Math.max(1.2, width * 0.0025);
-  const labelKanjiSize = Math.max(11, Math.min(15, width * 0.024));
-  const labelHiraganaSize = Math.max(16, Math.min(26, width * 0.045));
-  const insetHiraganaSize = Math.max(13, Math.min(18, width * 0.032));
+  const labelFontSize = Math.max(11, Math.min(15, width * 0.024));
+  const insetLabelFontSize = Math.max(10, Math.min(13, width * 0.02));
 
   const visibleMainland = useMemo(() => {
     if (!isFocused || !focusKanjiSet) return mainland;
@@ -121,7 +120,7 @@ export function JapanMap({
     };
   }, [showOkinawaInset, okinawa, width, height, includesOkinawa, hasMainlandFocus]);
 
-  function buildLabel(kanji: string, x: number, y: number, hiraganaSize = labelHiraganaSize) {
+  function buildLabel(kanji: string, x: number, y: number, fontSize = labelFontSize) {
     const pref = prefectureByKanji.get(kanji);
     return {
       kanji,
@@ -129,7 +128,7 @@ export function JapanMap({
       hiragana: pref ? getShortHiragana(kanji, pref.hiragana) : '',
       x,
       y,
-      hiraganaSize,
+      fontSize,
     };
   }
 
@@ -151,7 +150,7 @@ export function JapanMap({
     }
 
     return items;
-  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths, labelHiraganaSize]);
+  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths, labelFontSize]);
 
   const insetLabel = useMemo(() => {
     if (!showPrefectureLabels || !okinawaInset || !includesOkinawa) return null;
@@ -160,8 +159,8 @@ export function JapanMap({
     const point = getProjectedCentroid(okinawaInset.simplified, okinawaInset.pathGen);
     if (!point) return null;
 
-    return buildLabel(OKINAWA_KANJI, point[0], point[1], insetHiraganaSize);
-  }, [showPrefectureLabels, okinawaInset, includesOkinawa, okinawaFullPath, insetHiraganaSize]);
+    return buildLabel(OKINAWA_KANJI, point[0], point[1], insetLabelFontSize);
+  }, [showPrefectureLabels, okinawaInset, includesOkinawa, okinawaFullPath, insetLabelFontSize]);
 
   function getFill(kanji: string, baseColor: string): string {
     if (correctKanji === kanji) return '#4ade80';
@@ -208,7 +207,7 @@ export function JapanMap({
 
     return (
       <g className="prefecture-labels" pointerEvents="none">
-        {labels.map(({ kanji, name, hiragana, x, y, hiraganaSize }) => (
+        {labels.map(({ kanji, name, hiragana, x, y, fontSize }) => (
           <text
             key={kanji}
             x={x}
@@ -221,17 +220,17 @@ export function JapanMap({
               x={x}
               dy="-0.55em"
               className="prefecture-label-kanji"
-              fontSize={labelKanjiSize}
+              fontSize={fontSize}
               fontWeight={highlightedKanji === kanji ? 800 : 700}
             >
               {name}
             </tspan>
             <tspan
               x={x}
-              dy="1.2em"
+              dy="1.15em"
               className="prefecture-label-hiragana"
-              fontSize={hiraganaSize}
-              fontWeight={800}
+              fontSize={fontSize}
+              fontWeight={highlightedKanji === kanji ? 800 : 700}
             >
               {hiragana}
             </tspan>
