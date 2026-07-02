@@ -1,4 +1,5 @@
 import { getProgressKey } from './regions';
+import { getActiveProgress, saveActiveProgress } from './players';
 
 export interface PlayerProgress {
   level: number;
@@ -6,8 +7,6 @@ export interface PlayerProgress {
   masteredRegions: string[];
   title: string;
 }
-
-const STORAGE_KEY = 'nihon-chizu-progress';
 
 export const TITLES: { minLevel: number; title: string }[] = [
   { minLevel: 1, title: 'うんぴくんレベル' },
@@ -28,57 +27,48 @@ export function getTitleForLevel(level: number): string {
   return sorted.find((t) => level >= t.minLevel)?.title ?? TITLES[0].title;
 }
 
-export function loadProgress(): PlayerProgress {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      let progress = JSON.parse(raw) as PlayerProgress;
-      let changed = false;
-
-      if (progress.masteredRegions.includes('okinawa') && !progress.masteredRegions.includes('kyushu')) {
-        progress = {
-          ...progress,
-          masteredRegions: [
-            ...progress.masteredRegions.filter((k) => k !== 'okinawa'),
-            'kyushu',
-          ],
-        };
-        changed = true;
-      }
-
-      const chubuSubs = ['chubu:hokuriku', 'chubu:koshinetsu', 'chubu:tokai'];
-      const hasAllChubuSubs = chubuSubs.every((k) => progress.masteredRegions.includes(k));
-      const hasChubuSubs = progress.masteredRegions.some((k) => chubuSubs.includes(k));
-
-      if (hasChubuSubs || hasAllChubuSubs) {
-        let masteredRegions = progress.masteredRegions.filter((k) => !chubuSubs.includes(k));
-        if (hasAllChubuSubs && !masteredRegions.includes('chubu')) {
-          masteredRegions = [...masteredRegions, 'chubu'];
-        }
-        progress = { ...progress, masteredRegions };
-        changed = true;
-      }
-
-      if (changed) {
-        saveProgress(progress);
-      }
-
-      const title = getTitleForLevel(progress.level);
-      if (progress.title !== title) {
-        progress = { ...progress, title };
-        saveProgress(progress);
-      }
-
-      return progress;
-    }
-  } catch {
-    /* ignore */
-  }
-  return { level: 1, xp: 0, masteredRegions: [], title: TITLES[0].title };
+export function getTitleLevel(title: string): number {
+  return TITLES.find((t) => t.title === title)?.minLevel ?? 1;
 }
 
-export function saveProgress(progress: PlayerProgress): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+/** 旧データ形式のマイグレーション（純粋関数） */
+export function migrateProgress(progress: PlayerProgress): PlayerProgress {
+  let migrated = { ...progress };
+
+  if (migrated.masteredRegions.includes('okinawa') && !migrated.masteredRegions.includes('kyushu')) {
+    migrated = {
+      ...migrated,
+      masteredRegions: [
+        ...migrated.masteredRegions.filter((k) => k !== 'okinawa'),
+        'kyushu',
+      ],
+    };
+  }
+
+  const chubuSubs = ['chubu:hokuriku', 'chubu:koshinetsu', 'chubu:tokai'];
+  const hasAllChubuSubs = chubuSubs.every((k) => migrated.masteredRegions.includes(k));
+  const hasChubuSubs = migrated.masteredRegions.some((k) => chubuSubs.includes(k));
+
+  if (hasChubuSubs || hasAllChubuSubs) {
+    let masteredRegions = migrated.masteredRegions.filter((k) => !chubuSubs.includes(k));
+    if (hasAllChubuSubs && !masteredRegions.includes('chubu')) {
+      masteredRegions = [...masteredRegions, 'chubu'];
+    }
+    migrated = { ...migrated, masteredRegions };
+  }
+
+  return migrated;
+}
+
+export function loadProgress(): PlayerProgress {
+  const progress = migrateProgress(getActiveProgress());
+  const title = getTitleForLevel(progress.level);
+  if (progress.title !== title) {
+    const updated = { ...progress, title };
+    saveActiveProgress(updated);
+    return updated;
+  }
+  return progress;
 }
 
 export function isRegionMastered(regionId: string, subRegionId?: string): boolean {
@@ -101,7 +91,7 @@ export function masterRegion(regionId: string, subRegionId?: string): PlayerProg
   const title = getTitleForLevel(level);
 
   const updated: PlayerProgress = { level, xp, masteredRegions, title };
-  saveProgress(updated);
+  saveActiveProgress(updated);
   return updated;
 }
 

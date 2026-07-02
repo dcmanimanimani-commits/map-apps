@@ -7,6 +7,8 @@ import { ExploreMode } from './components/ExploreMode';
 import { RegionSelect } from './components/RegionSelect';
 import { RegionStudy } from './components/RegionStudy';
 import { PlayerStatus } from './components/PlayerStatus';
+import { PlayerSelect } from './components/PlayerSelect';
+import { PlayerProvider, usePlayer } from './context/PlayerContext';
 import './App.css';
 
 type Screen =
@@ -25,10 +27,14 @@ const quizModes = [
   { id: 'explore' as const, emoji: '🔍', title: '地図でべんきょう', desc: '地図を自由にタップして確認', color: '#06D6A0' },
 ];
 
-function App() {
+function AppContent() {
   const { geo, loading, error } = useJapanGeo();
+  const { activePlayer } = usePlayer();
   const [screen, setScreen] = useState<Screen>('home');
   const [studyRegion, setStudyRegion] = useState<string | null>(null);
+  const [pickingPlayer, setPickingPlayer] = useState(() => !activePlayer);
+
+  const openPlayerSelect = () => setPickingPlayer(true);
 
   if (loading) {
     return (
@@ -49,6 +55,16 @@ function App() {
     );
   }
 
+  if (pickingPlayer) {
+    return (
+      <PlayerSelect
+        onReady={() => setPickingPlayer(false)}
+        allowBack={Boolean(activePlayer)}
+        onBack={() => setPickingPlayer(false)}
+      />
+    );
+  }
+
   if (screen === 'regions') {
     return (
       <RegionSelect
@@ -57,6 +73,7 @@ function App() {
           setStudyRegion(id);
           setScreen('region-study');
         }}
+        onSwitchPlayer={openPlayerSelect}
       />
     );
   }
@@ -68,6 +85,7 @@ function App() {
         regionId={studyRegion}
         onBack={() => setScreen('regions')}
         onMastered={() => setScreen('regions')}
+        onSwitchPlayer={openPlayerSelect}
       />
     );
   }
@@ -86,7 +104,7 @@ function App() {
         </h1>
       </header>
 
-      <PlayerStatus />
+      <PlayerStatus onSwitchPlayer={openPlayerSelect} />
 
       <button className="main-mode-card" onClick={() => setScreen('regions')}>
         <span className="main-mode-emoji">📚</span>
@@ -114,6 +132,14 @@ function App() {
         </div>
       </section>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <PlayerProvider>
+      <AppContent />
+    </PlayerProvider>
   );
 }
 

@@ -1,24 +1,27 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { getPrefecturesByRegion, getRandomPrefecture, prefectureByKanji, type Prefecture } from '../data/prefectures';
+import { usePlayer } from '../context/PlayerContext';
 import { getStudyRegion } from '../data/regions';
-import { masterRegion } from '../data/progress';
 import { JapanMap } from './JapanMap';
 import { FeedbackBanner } from './FeedbackBanner';
 import { PlayerStatus } from './PlayerStatus';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface RegionStudyProps {
   geo: JapanGeoJSON;
   regionId: string;
   onBack: () => void;
   onMastered: () => void;
+  onSwitchPlayer?: () => void;
 }
 
 type Phase = 'learn' | 'quiz' | 'clear';
 
 const QUIZ_GOAL = 8;
 
-export function RegionStudy({ geo, regionId, onBack, onMastered }: RegionStudyProps) {
+export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer }: RegionStudyProps) {
+  const { masterRegion } = usePlayer();
   const region = getStudyRegion(regionId);
   const prefs = useMemo(
     () => getPrefecturesByRegion(regionId),
@@ -108,6 +111,7 @@ export function RegionStudy({ geo, regionId, onBack, onMastered }: RegionStudyPr
     return (
       <div className="game-screen">
         <div className="clear-card">
+          <PlayerAvatar title={newTitle ?? undefined} size="lg" className="clear-avatar" />
           <span className="clear-emoji">🏆</span>
           <h2>{regionLabel}マスター！</h2>
           <p>レベルアップ！称号がもらえたよ</p>
@@ -129,7 +133,7 @@ export function RegionStudy({ geo, regionId, onBack, onMastered }: RegionStudyPr
           <h2>{region.emoji} {regionLabel}</h2>
         </header>
 
-        <PlayerStatus />
+        <PlayerStatus onSwitchPlayer={onSwitchPlayer} />
 
         <div className="learn-progress">
           {visitedKanji.size} / {prefs.length} 県を見たよ

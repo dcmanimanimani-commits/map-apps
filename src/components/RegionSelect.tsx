@@ -5,9 +5,10 @@ import { PlayerStatus } from './PlayerStatus';
 interface RegionSelectProps {
   onBack: () => void;
   onSelect: (regionId: string) => void;
+  onSwitchPlayer?: () => void;
 }
 
-export function RegionSelect({ onBack, onSelect }: RegionSelectProps) {
+export function RegionSelect({ onBack, onSelect, onSwitchPlayer }: RegionSelectProps) {
   return (
     <div className="game-screen region-select-screen">
       <header className="game-header compact">
@@ -15,7 +16,7 @@ export function RegionSelect({ onBack, onSelect }: RegionSelectProps) {
         <h2>🗾 地方べんきょう</h2>
       </header>
 
-      <PlayerStatus />
+      <PlayerStatus onSwitchPlayer={onSwitchPlayer} />
 
       <p className="region-intro">まず地方ごとに都道府県を覚えよう！全部マスターしたらクイズが解放されるよ</p>
 
