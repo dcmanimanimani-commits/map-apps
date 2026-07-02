@@ -10,13 +10,14 @@ export interface PlayerProgress {
 const STORAGE_KEY = 'nihon-chizu-progress';
 
 export const TITLES: { minLevel: number; title: string }[] = [
-  { minLevel: 1, title: '見習い探検家' },
-  { minLevel: 2, title: '地図好きの旅人' },
-  { minLevel: 3, title: '地方マスター見習い' },
-  { minLevel: 4, title: '日本地図の勇者' },
-  { minLevel: 5, title: '都道府県博士' },
-  { minLevel: 6, title: '伝説の地図マスター' },
-  { minLevel: 7, title: 'にほんちずの神' },
+  { minLevel: 1, title: 'うんぴくんレベル' },
+  { minLevel: 2, title: 'だんごむしレベル' },
+  { minLevel: 3, title: 'てんとうむしちゃんレベル' },
+  { minLevel: 4, title: '赤ちゃんハムスターレベル' },
+  { minLevel: 5, title: 'ケガしたハムスターレベル' },
+  { minLevel: 6, title: 'おばあちゃん猫レベル' },
+  { minLevel: 7, title: 'むし歯だらけのライオンレベル' },
+  { minLevel: 8, title: 'マッチョの象レベル' },
 ];
 
 const XP_PER_REGION = 100;
@@ -61,6 +62,13 @@ export function loadProgress(): PlayerProgress {
       if (changed) {
         saveProgress(progress);
       }
+
+      const title = getTitleForLevel(progress.level);
+      if (progress.title !== title) {
+        progress = { ...progress, title };
+        saveProgress(progress);
+      }
+
       return progress;
     }
   } catch {
