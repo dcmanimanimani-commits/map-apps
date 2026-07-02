@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
-import { getPrefecturesByRegion, getRandomPrefecture, type Prefecture } from '../data/prefectures';
+import { getPrefecturesByRegion, getRandomPrefecture, prefectureByKanji, type Prefecture } from '../data/prefectures';
 import { getStudyRegion } from '../data/regions';
 import { masterRegion } from '../data/progress';
 import { JapanMap } from './JapanMap';
@@ -31,7 +31,8 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
     : region?.name ?? '';
 
   const [phase, setPhase] = useState<Phase>('learn');
-  const [learnIndex, setLearnIndex] = useState(0);
+  const [selectedKanji, setSelectedKanji] = useState<string | null>(null);
+  const [visitedKanji, setVisitedKanji] = useState<Set<string>>(() => new Set());
   const [target, setTarget] = useState<Prefecture>(() => prefs[0]);
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(0);
@@ -45,7 +46,8 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
   const [newTitle, setNewTitle] = useState<string | null>(null);
 
   const activeKanjiSet = useMemo(() => new Set(prefs.map((p) => p.kanji)), [prefs]);
-  const current = prefs[learnIndex];
+  const selected = selectedKanji ? prefectureByKanji.get(selectedKanji) : null;
+  const allVisited = visitedKanji.size >= prefs.length;
 
   const nextQuiz = useCallback((last?: Prefecture) => {
     const next = getRandomPrefecture(last, prefs);
@@ -55,6 +57,12 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
     setLocked(false);
     setFeedback({ message: 'この県はどこ？地図をタップ！', type: 'info' });
   }, [prefs]);
+
+  const handleLearnTap = (kanji: string) => {
+    if (!activeKanjiSet.has(kanji)) return;
+    setSelectedKanji(kanji);
+    setVisitedKanji((prev) => new Set(prev).add(kanji));
+  };
 
   const handleMapClick = (kanji: string) => {
     if (locked || phase !== 'quiz') return;
@@ -85,7 +93,8 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
           setFeedback({ message: 'もう少し！べんきょうからやり直そう', type: 'error' });
           setTimeout(() => {
             setPhase('learn');
-            setLearnIndex(0);
+            setSelectedKanji(null);
+            setVisitedKanji(new Set());
             setScore(0);
             setAnswered(0);
           }, 1500);
@@ -126,40 +135,37 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
         <PlayerStatus />
 
         <div className="learn-progress">
-          {learnIndex + 1} / {prefs.length}
+          {visitedKanji.size} / {prefs.length} 県を見たよ
         </div>
 
         <div className="learn-card">
-          <span className="learn-emoji">{current.landmarkEmoji}</span>
-          <div className="learn-card-body">
-            <h3 className="learn-kanji">{current.kanji}</h3>
-            <p className="learn-hiragana">{current.hiragana}</p>
-            <p className="learn-landmark">{current.landmark}</p>
-          </div>
+          {selected ? (
+            <>
+              <span className="learn-emoji">{selected.landmarkEmoji}</span>
+              <div className="learn-card-body">
+                <h3 className="learn-kanji">{selected.kanji}</h3>
+                <p className="learn-hiragana">{selected.hiragana}</p>
+                <p className="learn-landmark">{selected.landmark}</p>
+              </div>
+            </>
+          ) : (
+            <p className="learn-prompt">👆 地図の県をタップして名物を見よう！</p>
+          )}
         </div>
 
         <div className="map-container compact-map region-focus-map">
           <JapanMap
             geo={geo}
-            highlightedKanji={current.kanji}
+            highlightedKanji={selectedKanji}
             focusKanjiSet={activeKanjiSet}
-            interactive={false}
+            showPrefectureLabels
+            onPrefectureClick={handleLearnTap}
+            interactive
           />
         </div>
 
-        <div className="learn-nav">
-          <button
-            className="btn-secondary"
-            disabled={learnIndex === 0}
-            onClick={() => setLearnIndex((i) => i - 1)}
-          >
-            ← まえ
-          </button>
-          {learnIndex < prefs.length - 1 ? (
-            <button className="btn-primary" onClick={() => setLearnIndex((i) => i + 1)}>
-              つぎ →
-            </button>
-          ) : (
+        {allVisited && (
+          <div className="learn-nav">
             <button
               className="btn-primary"
               onClick={() => {
@@ -167,10 +173,10 @@ export function RegionStudy({ geo, regionId, subRegionId, onBack, onMastered }: 
                 nextQuiz();
               }}
             >
-              クイズへ！
+              ぜんぶ見た！クイズへ →
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }

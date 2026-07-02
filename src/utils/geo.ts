@@ -7,6 +7,8 @@ export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';
 export const OKINAWA_CLIP_ID = 'okinawa-clip';
 
+type GeoPath = ReturnType<typeof geoPath>;
+
 /** L字区切りの角（画面右下の沖縄エリア） */
 export function getOkinawaCorner(width: number, height: number) {
   const insetW = Math.max(width * 0.36, 150);
@@ -37,7 +39,7 @@ export function createMainlandPathGenerator(mainland: JapanGeoJSON, width: numbe
 }
 
 /** 選択地方のみ表示：その地方にフィットする投影 */
-export function createRegionFocusPathGenerator(regionGeo: JapanGeoJSON, width: number, height: number) {
+export function createRegionFocusPathGenerator(regionGeo: JapanGeoJSON, width: number, height: number): GeoPath {
   const pad = 20;
   const fitGeo = trimMainlandForProjection(regionGeo);
 
@@ -54,7 +56,7 @@ export function createOkinawaFullPathGenerator(
   okinawa: PrefectureFeature,
   width: number,
   height: number,
-) {
+): GeoPath {
   const simplified = simplifyOkinawaForInset(okinawa);
   const pad = 24;
 
@@ -64,6 +66,16 @@ export function createOkinawaFullPathGenerator(
       simplified,
     ),
   );
+}
+
+export function getProjectedCentroid(
+  feature: Feature<Geometry, GeoJsonProperties>,
+  pathGen: GeoPath,
+): [number, number] | null {
+  const projection = pathGen.projection();
+  if (!projection || typeof projection !== 'function') return null;
+  const point = (projection as (coords: [number, number]) => [number, number] | null)(geoCentroid(feature));
+  return point ?? null;
 }
 
 export interface OkinawaInsetLayout {
