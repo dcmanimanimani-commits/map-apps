@@ -1192,6 +1192,72 @@
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   touch-action: none;
+  flex-shrink: 0;
+}
+
+.hanzi-canvas-lg {
+  border: 3px solid #c7d2fe;
+}
+
+.hanzi-combo-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.hanzi-canvas-combo {
+  border: 2px solid #e2e8f0;
+  opacity: 0.55;
+  transition: opacity 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.hanzi-canvas-combo.active {
+  opacity: 1;
+  border-color: #6366f1;
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+}
+
+.hanzi-canvas-combo.done {
+  opacity: 0.85;
+  border-color: #22c55e;
+}
+
+.kanji-step-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-weight: 800;
+}
+
+.kanji-step-char,
+.kanji-step-full {
+  padding: 0.2rem 0.45rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.kanji-step-char.active,
+.kanji-step-full.active {
+  background: #6366f1;
+  color: white;
+}
+
+.kanji-step-char.done {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.kanji-step-full {
+  font-size: 0.85rem;
 }
 
 .hanzi-hint {
