@@ -13,7 +13,7 @@ export function useJapanGeo() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/japan.geojson')
+    fetch(`${import.meta.env.BASE_URL}japan.geojson`)
       .then((res) => {
         if (!res.ok) throw new Error('地図データの読み込みに失敗しました');
         return res.json();
