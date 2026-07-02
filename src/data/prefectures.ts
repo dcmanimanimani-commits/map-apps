@@ -31,6 +31,12 @@ export function getShortKanji(kanji: string): string {
   return kanji.replace(/[都道府県]/g, '');
 }
 
+/** 地図ラベル用の短いひらがな */
+export function getShortHiragana(kanji: string, hiragana: string): string {
+  if (kanji === '北海道') return hiragana;
+  return hiragana.replace(/(けん|とう|ふ|と)$/, '');
+}
+
 export function getKanjiChars(kanji: string): string[] {
   return [...getShortKanji(kanji)];
 }

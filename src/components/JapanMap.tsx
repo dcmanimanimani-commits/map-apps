@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
-import { getRegionColor, getShortKanji, prefectureByKanji } from '../data/prefectures';
+import { getRegionColor, getShortHiragana, getShortKanji, prefectureByKanji } from '../data/prefectures';
 import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
 import {
   createMainlandPathGenerator,
@@ -50,7 +50,9 @@ export function JapanMap({
   const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
   const strokeWidth = Math.max(1.2, width * 0.0025);
-  const labelFontSize = Math.max(11, Math.min(18, width * 0.028));
+  const labelKanjiSize = Math.max(11, Math.min(15, width * 0.024));
+  const labelHiraganaSize = Math.max(16, Math.min(26, width * 0.045));
+  const insetHiraganaSize = Math.max(13, Math.min(18, width * 0.032));
 
   const visibleMainland = useMemo(() => {
     if (!isFocused || !focusKanjiSet) return mainland;
@@ -119,37 +121,37 @@ export function JapanMap({
     };
   }, [showOkinawaInset, okinawa, width, height, includesOkinawa, hasMainlandFocus]);
 
+  function buildLabel(kanji: string, x: number, y: number, hiraganaSize = labelHiraganaSize) {
+    const pref = prefectureByKanji.get(kanji);
+    return {
+      kanji,
+      name: getShortKanji(kanji),
+      hiragana: pref ? getShortHiragana(kanji, pref.hiragana) : '',
+      x,
+      y,
+      hiraganaSize,
+    };
+  }
+
   const mainlandLabels = useMemo(() => {
     if (!showPrefectureLabels || !isFocused) return [];
 
-    const items: { kanji: string; label: string; x: number; y: number }[] = [];
+    const items: ReturnType<typeof buildLabel>[] = [];
 
     if (okinawaFullPath) {
       const point = getProjectedCentroid(okinawaFullPath.feature, okinawaFullPath.pathGen);
-      if (point) {
-        items.push({
-          kanji: OKINAWA_KANJI,
-          label: getShortKanji(OKINAWA_KANJI),
-          x: point[0],
-          y: point[1],
-        });
-      }
+      if (point) items.push(buildLabel(OKINAWA_KANJI, point[0], point[1]));
       return items;
     }
 
     for (const { kanji, pathGen, feature } of mainlandPaths) {
       const point = getProjectedCentroid(feature, pathGen);
       if (!point) continue;
-      items.push({
-        kanji,
-        label: getShortKanji(kanji),
-        x: point[0],
-        y: point[1],
-      });
+      items.push(buildLabel(kanji, point[0], point[1]));
     }
 
     return items;
-  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths]);
+  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths, labelHiraganaSize]);
 
   const insetLabel = useMemo(() => {
     if (!showPrefectureLabels || !okinawaInset || !includesOkinawa) return null;
@@ -158,15 +160,8 @@ export function JapanMap({
     const point = getProjectedCentroid(okinawaInset.simplified, okinawaInset.pathGen);
     if (!point) return null;
 
-    const insetLabelSize = Math.max(10, Math.min(14, width * 0.022));
-    return {
-      kanji: OKINAWA_KANJI,
-      label: getShortKanji(OKINAWA_KANJI),
-      x: point[0],
-      y: point[1],
-      fontSize: insetLabelSize,
-    };
-  }, [showPrefectureLabels, okinawaInset, includesOkinawa, okinawaFullPath, width]);
+    return buildLabel(OKINAWA_KANJI, point[0], point[1], insetHiraganaSize);
+  }, [showPrefectureLabels, okinawaInset, includesOkinawa, okinawaFullPath, insetHiraganaSize]);
 
   function getFill(kanji: string, baseColor: string): string {
     if (correctKanji === kanji) return '#4ade80';
@@ -208,25 +203,38 @@ export function JapanMap({
     );
   }
 
-  function renderLabels(
-    labels: { kanji: string; label: string; x: number; y: number; fontSize?: number }[],
-  ) {
+  function renderLabels(labels: ReturnType<typeof buildLabel>[]) {
     if (labels.length === 0) return null;
 
     return (
       <g className="prefecture-labels" pointerEvents="none">
-        {labels.map(({ kanji, label, x, y, fontSize }) => (
+        {labels.map(({ kanji, name, hiragana, x, y, hiraganaSize }) => (
           <text
             key={kanji}
             x={x}
             y={y}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="prefecture-label"
-            fontSize={fontSize ?? labelFontSize}
-            fontWeight={highlightedKanji === kanji ? 800 : 700}
+            className={highlightedKanji === kanji ? 'prefecture-label-group highlighted' : 'prefecture-label-group'}
           >
-            {label}
+            <tspan
+              x={x}
+              dy="-0.55em"
+              className="prefecture-label-kanji"
+              fontSize={labelKanjiSize}
+              fontWeight={highlightedKanji === kanji ? 800 : 700}
+            >
+              {name}
+            </tspan>
+            <tspan
+              x={x}
+              dy="1.2em"
+              className="prefecture-label-hiragana"
+              fontSize={hiraganaSize}
+              fontWeight={800}
+            >
+              {hiragana}
+            </tspan>
           </text>
         ))}
       </g>

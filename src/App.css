@@ -1018,13 +1018,25 @@
   stroke-width: 2;
 }
 
-.prefecture-label {
+.prefecture-label-kanji {
   fill: #ffffff;
   stroke: #1e3a5f;
-  stroke-width: 3px;
+  stroke-width: 2.5px;
   paint-order: stroke fill;
   font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
-  pointer-events: none;
+}
+
+.prefecture-label-hiragana {
+  fill: #fff7ed;
+  stroke: #1e3a5f;
+  stroke-width: 4px;
+  paint-order: stroke fill;
+  font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.prefecture-label-group.highlighted .prefecture-label-hiragana {
+  fill: #fef08a;
 }
 
 .learn-prompt {
