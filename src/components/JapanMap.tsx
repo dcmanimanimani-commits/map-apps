@@ -60,8 +60,13 @@ export function JapanMap({
     };
   }, [mainland, focusKanjiSet, isFocused]);
 
-  const showOkinawaFull = isFocused && focusKanjiSet?.has(OKINAWA_KANJI) && okinawa;
-  const showOkinawaInset = !isFocused && okinawa;
+  const hasMainlandFocus = visibleMainland.features.length > 0;
+  const includesOkinawa = Boolean(isFocused && focusKanjiSet?.has(OKINAWA_KANJI));
+
+  const showOkinawaFull = includesOkinawa && okinawa && !hasMainlandFocus;
+  const showOkinawaInset = Boolean(
+    okinawa && ((!isFocused) || (includesOkinawa && hasMainlandFocus)),
+  );
 
   const mainlandPaths = useMemo(() => {
     if (showOkinawaFull) return [];
@@ -123,6 +128,25 @@ export function JapanMap({
       return items;
     }
 
+    if (showOkinawaInset && includesOkinawa && okinawaInset) {
+      const pathGen = createOkinawaInsetPathGenerator(
+        okinawa!,
+        okinawaInset.layout,
+        width,
+        height,
+      );
+      const simplified = simplifyOkinawaForInset(okinawa!);
+      const point = getProjectedCentroid(simplified, pathGen);
+      if (point) {
+        items.push({
+          kanji: OKINAWA_KANJI,
+          label: getShortKanji(OKINAWA_KANJI),
+          x: point[0],
+          y: point[1],
+        });
+      }
+    }
+
     for (const { kanji, pathGen, feature } of mainlandPaths) {
       const point = getProjectedCentroid(feature, pathGen);
       if (!point) continue;
@@ -135,7 +159,7 @@ export function JapanMap({
     }
 
     return items;
-  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths]);
+  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths, showOkinawaInset, includesOkinawa, okinawaInset, okinawa, width, height]);
 
   function getFill(kanji: string, baseColor: string): string {
     if (correctKanji === kanji) return '#4ade80';
@@ -236,7 +260,7 @@ export function JapanMap({
             d ? renderPath(kanji, d, color) : null,
           )}
           {okinawaFullPath?.d &&
-            renderPath(OKINAWA_KANJI, okinawaFullPath.d, getRegionColor('沖縄'))}
+            renderPath(OKINAWA_KANJI, okinawaFullPath.d, getRegionColor('九州'))}
           {renderLabels()}
         </g>
 
@@ -254,7 +278,7 @@ export function JapanMap({
               renderPath(
                 OKINAWA_KANJI,
                 okinawaInset.d,
-                getRegionColor('沖縄'),
+                getRegionColor('九州'),
               )}
           </g>
         )}

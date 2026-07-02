@@ -67,14 +67,7 @@ export const studyRegions: StudyRegion[] = [
     name: '九州地方',
     emoji: '🌋',
     color: '#c41e7a',
-    description: '南の大きな島',
-  },
-  {
-    id: 'okinawa',
-    name: '沖縄',
-    emoji: '🏝️',
-    color: '#c41e7a',
-    description: '南の海の島',
+    description: '九州と沖縄の島',
   },
 ];
 

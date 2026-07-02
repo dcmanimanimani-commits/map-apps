@@ -101,7 +101,7 @@ export const prefectures: Prefecture[] = [
   P(44, '大分県', 'おおいたけん', '九州', '温泉・別府', '♨️'),
   P(45, '宮崎県', 'みやざきけん', '九州', 'マンゴー・高千穂', '🥭'),
   P(46, '鹿児島県', 'かごしまけん', '九州', 'さつまいも・桜島', '🌋'),
-  P(47, '沖縄県', 'おきなわけん', '沖縄', 'シーサー・美ら海', '🏝️'),
+  P(47, '沖縄県', 'おきなわけん', '九州', 'シーサー・美ら海', '🏝️'),
 ];
 
 export const prefectureByKanji = new Map(prefectures.map((p) => [p.kanji, p]));
@@ -132,7 +132,6 @@ export function getPrefecturesByRegion(regionId: string, subRegionId?: string): 
     chugoku: '中国',
     shikoku: '四国',
     kyushu: '九州',
-    okinawa: '沖縄',
   };
   const label = regionMap[regionId];
   return prefectures.filter((p) => p.region === label);

@@ -30,7 +30,19 @@ export function getTitleForLevel(level: number): string {
 export function loadProgress(): PlayerProgress {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as PlayerProgress;
+    if (raw) {
+      const progress = JSON.parse(raw) as PlayerProgress;
+      if (progress.masteredRegions.includes('okinawa') && !progress.masteredRegions.includes('kyushu')) {
+        const masteredRegions = [
+          ...progress.masteredRegions.filter((k) => k !== 'okinawa'),
+          'kyushu',
+        ];
+        const updated = { ...progress, masteredRegions };
+        saveProgress(updated);
+        return updated;
+      }
+      return progress;
+    }
   } catch {
     /* ignore */
   }
@@ -70,7 +82,7 @@ export function areAllRegionsMastered(): boolean {
   const requiredKeys = [
     'hokkaido', 'tohoku', 'kanto',
     'chubu:hokuriku', 'chubu:koshinetsu', 'chubu:tokai',
-    'kinki', 'chugoku', 'shikoku', 'kyushu', 'okinawa',
+    'kinki', 'chugoku', 'shikoku', 'kyushu',
   ];
   return requiredKeys.every((k) => progress.masteredRegions.includes(k));
 }
