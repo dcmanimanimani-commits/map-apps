@@ -1,8 +1,16 @@
 .app {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 2rem;
-  min-height: 100vh;
+  padding: 0.5rem 0.75rem;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow-y: auto;
+}
+
+.compact-home {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .app.home {
@@ -130,9 +138,25 @@
 .game-screen {
   max-width: 900px;
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding: 0.35rem 0.5rem;
+}
+
+.game-header.compact {
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+}
+
+.game-header.compact h2 {
+  font-size: 1.15rem;
+}
+
+.game-header.compact .game-desc {
+  display: none;
 }
 
 .game-play-area {
@@ -578,11 +602,11 @@
   color: #3730a3;
 }
 
-/* iPad 横向き・大画面：地図を主役に */
+/* iPad 横向き・大画面：地図クイズのみサイドバー＋地図 */
 @media (orientation: landscape) and (min-width: 700px) {
   .game-screen {
     max-width: none;
-    padding: 0 1rem 1rem;
+    padding: 0 1rem 0.75rem;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -688,7 +712,13 @@
   }
 
   .map-container {
-    min-height: 380px;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .compact-map {
+    min-height: 0 !important;
+    flex: 1;
   }
 }
 
@@ -707,6 +737,426 @@
   }
 
   .map-container {
-    min-height: 340px;
+    min-height: 0;
+    flex: 1;
   }
+}
+
+/* ===== Compact & New Features ===== */
+
+.hero.compact {
+  margin-bottom: 0;
+}
+
+.hero-title.sm {
+  font-size: 1.35rem;
+  margin-bottom: 0;
+}
+
+.title-emoji.sm {
+  font-size: 1.8rem;
+  display: inline;
+  margin-right: 0.25rem;
+}
+
+.player-status {
+  background: white;
+  border-radius: 12px;
+  padding: 0.45rem 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.player-level {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.level-badge {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  font-weight: 800;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 8px;
+}
+
+.player-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1e3a5f;
+}
+
+.xp-bar-wrap {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.2rem;
+}
+
+.xp-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.xp-text {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.main-mode-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  text-align: left;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+  flex-shrink: 0;
+}
+
+.main-mode-emoji {
+  font-size: 2rem;
+}
+
+.main-mode-title {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.main-mode-desc {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.main-mode-arrow {
+  margin-left: auto;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.section-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #475569;
+  margin-bottom: 0.4rem;
+}
+
+.quiz-section {
+  flex: 1;
+  min-height: 0;
+}
+
+.mode-grid.compact {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0;
+}
+
+.mode-card.sm {
+  padding: 0.65rem;
+  gap: 0.25rem;
+}
+
+.mode-card.sm.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mode-emoji.sm {
+  font-size: 1.5rem;
+}
+
+.mode-title.sm {
+  font-size: 0.85rem;
+}
+
+.region-intro {
+  font-size: 0.8rem;
+  color: #475569;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.region-select-screen {
+  overflow-y: auto;
+}
+
+.region-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.region-card {
+  background: white;
+  border-radius: 14px;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  border: 2px solid var(--region-color, #ccc);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+.region-card.mastered {
+  background: #f0fdf4;
+}
+
+.region-emoji {
+  font-size: 1.5rem;
+}
+
+.region-name {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #1e3a5f;
+}
+
+.master-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.75rem;
+}
+
+.region-expand {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.region-chubu-block {
+  grid-column: 1 / -1;
+}
+
+.subregion-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.subregion-card {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  border: 2px solid #e2e8f0;
+}
+
+.subregion-card.mastered {
+  background: #f0fdf4;
+  border-color: #22c55e;
+}
+
+.region-study-screen {
+  gap: 0.35rem;
+}
+
+.region-study-screen .learn-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+  padding: 0.45rem 0.75rem;
+}
+
+.region-study-screen .learn-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.region-study-screen .learn-emoji {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+}
+
+.region-study-screen .learn-kanji {
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.region-study-screen .learn-hiragana,
+.region-study-screen .learn-landmark {
+  font-size: 0.75rem;
+}
+
+.region-study-screen .player-status {
+  padding: 0.35rem 0.6rem;
+}
+
+.region-focus-map {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.region-focus-map .japan-map-wrapper {
+  min-height: 0;
+}
+
+.japan-map-wrapper.region-focus .prefecture-path {
+  stroke-width: 2;
+}
+
+.learn-progress {
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.learn-card {
+  background: white;
+  border-radius: 14px;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.learn-emoji {
+  font-size: 2rem;
+}
+
+.learn-kanji {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e3a5f;
+}
+
+.learn-hiragana {
+  font-size: 0.85rem;
+  color: #6366f1;
+  font-weight: 700;
+}
+
+.learn-landmark {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.learn-nav {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-shrink: 0;
+  padding-bottom: 0.25rem;
+}
+
+.question-card.compact {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.landmark-display.compact .landmark-emoji.sm {
+  font-size: 1.5rem;
+}
+
+.landmark-name.sm {
+  font-size: 1rem;
+}
+
+.quiz-score {
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: #1e3a5f;
+  flex-shrink: 0;
+}
+
+.flex-grow {
+  flex: 1;
+  min-height: 0;
+}
+
+.clear-card, .locked-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  margin: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.clear-emoji, .locked-emoji {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.new-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #6366f1;
+  margin: 0.5rem 0 1rem;
+}
+
+.kanji-write-screen {
+  gap: 0.35rem;
+}
+
+.hanzi-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.hanzi-canvas {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  touch-action: none;
+}
+
+.hanzi-hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.35rem;
+}
+
+.hanzi-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-shrink: 0;
+  padding-bottom: 0.25rem;
+}
+
+.char-progress {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.region-study-screen .feedback-banner,
+.kanji-write-screen .feedback-banner {
+  margin-bottom: 0.25rem;
+  min-height: 36px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
 }

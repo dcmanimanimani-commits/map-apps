@@ -3,6 +3,7 @@ export interface Prefecture {
   kanji: string;
   hiragana: string;
   region: string;
+  subRegion?: string;
   landmark: string;
   landmarkEmoji: string;
   color: string;
@@ -27,7 +28,11 @@ export function getRegionColor(region: string): string {
 
 export function getShortKanji(kanji: string): string {
   if (kanji === '北海道') return '北海道';
-  return kanji.replace(/[都府県]/g, '');
+  return kanji.replace(/[都道府県]/g, '');
+}
+
+export function getKanjiChars(kanji: string): string[] {
+  return [...getShortKanji(kanji)];
 }
 
 const P = (
@@ -37,11 +42,13 @@ const P = (
   region: string,
   landmark: string,
   landmarkEmoji: string,
+  subRegion?: string,
 ): Prefecture => ({
   id,
   kanji,
   hiragana,
   region,
+  subRegion,
   landmark,
   landmarkEmoji,
   color: getRegionColor(region),
@@ -62,16 +69,16 @@ export const prefectures: Prefecture[] = [
   P(12, '千葉県', 'ちばけん', '関東', '落花生・ディズニーランド', '🥜'),
   P(13, '東京都', 'とうきょうと', '関東', '東京タワー・スカイツリー', '🗼'),
   P(14, '神奈川県', 'かながわけん', '関東', '横浜中華街・鎌倉大仏', '⛩️'),
-  P(15, '新潟県', 'にいがたけん', '中部', 'コシヒカリ・佐渡', '🍚'),
-  P(16, '富山県', 'とやまけん', '中部', 'ホタルイカ・立山', '🦑'),
-  P(17, '石川県', 'いしかわけん', '中部', '金沢・兼六園', '🏯'),
-  P(18, '福井県', 'ふくいけん', '中部', '越前ガニ・東尋坊', '🦀'),
-  P(19, '山梨県', 'やまなしけん', '中部', 'ぶどう・富士山', '🍇'),
-  P(20, '長野県', 'ながのけん', '中部', 'そば・軽井沢', '🏔️'),
-  P(21, '岐阜県', 'ぎふけん', '中部', '飛騨牛・白川郷', '🏠'),
-  P(22, '静岡県', 'しずおかけん', '中部', 'お茶・富士山', '🍵'),
-  P(23, '愛知県', 'あいちけん', '中部', '味噌カツ・名古屋城', '🏰'),
-  P(24, '三重県', 'みえけん', '中部', '伊勢神宮・松阪牛', '🐄'),
+  P(15, '新潟県', 'にいがたけん', '中部', 'コシヒカリ・佐渡', '🍚', '甲信越'),
+  P(16, '富山県', 'とやまけん', '中部', 'ホタルイカ・立山', '🦑', '北陸'),
+  P(17, '石川県', 'いしかわけん', '中部', '金沢・兼六園', '🏯', '北陸'),
+  P(18, '福井県', 'ふくいけん', '中部', '越前ガニ・東尋坊', '🦀', '北陸'),
+  P(19, '山梨県', 'やまなしけん', '中部', 'ぶどう・富士山', '🍇', '甲信越'),
+  P(20, '長野県', 'ながのけん', '中部', 'そば・軽井沢', '🏔️', '甲信越'),
+  P(21, '岐阜県', 'ぎふけん', '中部', '飛騨牛・白川郷', '🏠', '東海'),
+  P(22, '静岡県', 'しずおかけん', '中部', 'お茶・富士山', '🍵', '東海'),
+  P(23, '愛知県', 'あいちけん', '中部', '味噌カツ・名古屋城', '🏰', '東海'),
+  P(24, '三重県', 'みえけん', '近畿', '伊勢神宮・松阪牛', '🐄'),
   P(25, '滋賀県', 'しがけん', '近畿', '琵琶湖・彦根城', '🌊'),
   P(26, '京都府', 'きょうとふ', '近畿', '金閣寺・お抹茶', '⛩️'),
   P(27, '大阪府', 'おおさかふ', '近畿', 'たこ焼き・通天閣', '🐙'),
@@ -100,14 +107,33 @@ export const prefectures: Prefecture[] = [
 export const prefectureByKanji = new Map(prefectures.map((p) => [p.kanji, p]));
 export const prefectureById = new Map(prefectures.map((p) => [p.id, p]));
 
-export function getRandomPrefecture(exclude?: Prefecture): Prefecture {
-  const pool = exclude ? prefectures.filter((p) => p.id !== exclude.id) : prefectures;
-  return pool[Math.floor(Math.random() * pool.length)];
+export function getRandomPrefecture(exclude?: Prefecture, pool = prefectures): Prefecture {
+  const list = exclude ? pool.filter((p) => p.id !== exclude.id) : pool;
+  return list[Math.floor(Math.random() * list.length)];
 }
 
-export function getRandomChoices(correct: Prefecture, count = 4): Prefecture[] {
-  const others = prefectures.filter((p) => p.id !== correct.id);
-  const shuffled = [...others].sort(() => Math.random() - 0.5);
-  const choices = [correct, ...shuffled.slice(0, count - 1)];
-  return choices.sort(() => Math.random() - 0.5);
+export function getPrefecturesByRegion(regionId: string, subRegionId?: string): Prefecture[] {
+  if (regionId === 'chubu' && subRegionId) {
+    const subMap: Record<string, string> = {
+      hokuriku: '北陸',
+      koshinetsu: '甲信越',
+      tokai: '東海',
+    };
+    const label = subMap[subRegionId];
+    return prefectures.filter((p) => p.region === '中部' && p.subRegion === label);
+  }
+
+  const regionMap: Record<string, string> = {
+    hokkaido: '北海道',
+    tohoku: '東北',
+    kanto: '関東',
+    chubu: '中部',
+    kinki: '近畿',
+    chugoku: '中国',
+    shikoku: '四国',
+    kyushu: '九州',
+    okinawa: '沖縄',
+  };
+  const label = regionMap[regionId];
+  return prefectures.filter((p) => p.region === label);
 }

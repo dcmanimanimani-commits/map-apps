@@ -6,7 +6,9 @@ import { getRegionColor, prefectureByKanji } from '../data/prefectures';
 import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
 import {
   createMainlandPathGenerator,
+  createOkinawaFullPathGenerator,
   createOkinawaInsetPathGenerator,
+  createRegionFocusPathGenerator,
   getFeatureKanji,
   getOkinawaInsetLayout,
   MAINLAND_CLIP_ID,
@@ -19,6 +21,9 @@ interface JapanMapProps {
   highlightedKanji?: string | null;
   correctKanji?: string | null;
   wrongKanji?: string | null;
+  activeKanjiSet?: Set<string>;
+  /** 指定時はその県のみ表示し、地方にズーム */
+  focusKanjiSet?: Set<string>;
   onPrefectureClick?: (kanji: string) => void;
   interactive?: boolean;
 }
@@ -28,18 +33,42 @@ export function JapanMap({
   highlightedKanji = null,
   correctKanji = null,
   wrongKanji = null,
+  activeKanjiSet,
+  focusKanjiSet,
   onPrefectureClick,
   interactive = true,
 }: JapanMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { width, height } = useMapSize(containerRef);
 
+  const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
   const strokeWidth = Math.max(1.2, width * 0.0025);
 
+  const visibleMainland = useMemo(() => {
+    if (!isFocused || !focusKanjiSet) return mainland;
+    return {
+      type: 'FeatureCollection' as const,
+      features: mainland.features.filter((f) =>
+        focusKanjiSet.has(getFeatureKanji(f as Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>)),
+      ),
+    };
+  }, [mainland, focusKanjiSet, isFocused]);
+
+  const showOkinawaFull = isFocused && focusKanjiSet?.has(OKINAWA_KANJI) && okinawa;
+  const showOkinawaInset = !isFocused && okinawa;
+
   const mainlandPaths = useMemo(() => {
-    const pathGen = createMainlandPathGenerator(mainland, width, height);
-    return mainland.features.map((feature) => {
+    if (showOkinawaFull) return [];
+
+    const source = isFocused ? visibleMainland : mainland;
+    if (source.features.length === 0) return [];
+
+    const pathGen = isFocused
+      ? createRegionFocusPathGenerator(visibleMainland, width, height)
+      : createMainlandPathGenerator(mainland, width, height);
+
+    return source.features.map((feature) => {
       const kanji = getFeatureKanji(feature as Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>);
       const d = pathGen(feature as Feature<Geometry, GeoJsonProperties>) ?? null;
       const pref = prefectureByKanji.get(kanji);
@@ -49,15 +78,21 @@ export function JapanMap({
         color: pref ? getRegionColor(pref.region) : '#888',
       };
     });
-  }, [mainland, width, height]);
+  }, [showOkinawaFull, isFocused, visibleMainland, mainland, width, height]);
+
+  const okinawaFullPath = useMemo(() => {
+    if (!showOkinawaFull || !okinawa) return null;
+    const pathGen = createOkinawaFullPathGenerator(okinawa, width, height);
+    return pathGen(simplifyOkinawaForInset(okinawa)) ?? null;
+  }, [showOkinawaFull, okinawa, width, height]);
 
   const okinawaInset = useMemo(() => {
-    if (!okinawa) return null;
+    if (!showOkinawaInset || !okinawa) return null;
     const layout = getOkinawaInsetLayout(width, height);
     const simplified = simplifyOkinawaForInset(okinawa);
     const pathGen = createOkinawaInsetPathGenerator(okinawa, layout, width, height);
     return { d: pathGen(simplified) ?? null, layout };
-  }, [okinawa, width, height]);
+  }, [showOkinawaInset, okinawa, width, height]);
 
   function getFill(kanji: string, baseColor: string): string {
     if (correctKanji === kanji) return '#4ade80';
@@ -67,6 +102,11 @@ export function JapanMap({
   }
 
   function getOpacity(kanji: string): number {
+    if (isFocused) {
+      if (highlightedKanji && highlightedKanji !== kanji) return 0.55;
+      return 1;
+    }
+    if (activeKanjiSet && !activeKanjiSet.has(kanji)) return 0.15;
     if (highlightedKanji && highlightedKanji !== kanji) return 0.4;
     return 1;
   }
@@ -91,7 +131,7 @@ export function JapanMap({
   }
 
   return (
-    <div ref={containerRef} className="japan-map-wrapper">
+    <div ref={containerRef} className={`japan-map-wrapper${isFocused ? ' region-focus' : ''}`}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="japan-map"
@@ -125,6 +165,8 @@ export function JapanMap({
           {mainlandPaths.map(({ kanji, d, color }) =>
             d ? renderPath(kanji, d, color) : null,
           )}
+          {okinawaFullPath &&
+            renderPath(OKINAWA_KANJI, okinawaFullPath, getRegionColor('沖縄'))}
         </g>
 
         {okinawaInset && (

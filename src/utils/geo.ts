@@ -36,6 +36,36 @@ export function createMainlandPathGenerator(mainland: JapanGeoJSON, width: numbe
   return geoPath(createMainlandProjection(mainland, width, height));
 }
 
+/** 選択地方のみ表示：その地方にフィットする投影 */
+export function createRegionFocusPathGenerator(regionGeo: JapanGeoJSON, width: number, height: number) {
+  const pad = 20;
+  const fitGeo = trimMainlandForProjection(regionGeo);
+
+  return geoPath(
+    geoMercator().fitExtent(
+      [[pad, pad], [width - pad, height - pad]],
+      fitGeo,
+    ),
+  );
+}
+
+/** 沖縄のみ表示：画面いっぱいにフィット */
+export function createOkinawaFullPathGenerator(
+  okinawa: PrefectureFeature,
+  width: number,
+  height: number,
+) {
+  const simplified = simplifyOkinawaForInset(okinawa);
+  const pad = 24;
+
+  return geoPath(
+    geoMercator().fitExtent(
+      [[pad, pad], [width - pad, height - pad]],
+      simplified,
+    ),
+  );
+}
+
 export interface OkinawaInsetLayout {
   cornerX: number;
   cornerY: number;
