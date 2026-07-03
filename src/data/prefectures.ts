@@ -41,6 +41,28 @@ export function getKanjiChars(kanji: string): string[] {
   return [...getShortKanji(kanji)];
 }
 
+/** 手書き練習用（県・府・都も含む） */
+export function getWriteKanjiChars(kanji: string): string[] {
+  return [...kanji];
+}
+
+export function shufflePrefectures(pool: Prefecture[]): Prefecture[] {
+  const list = [...pool];
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+export function buildKanjiWriteQueue(mode: 'regional' | 'national', regionId?: string): Prefecture[] {
+  if (mode === 'national') {
+    return shufflePrefectures(prefectures).slice(0, 20);
+  }
+  if (!regionId) return [];
+  return shufflePrefectures(getPrefecturesByRegion(regionId));
+}
+
 const P = (
   id: number,
   kanji: string,

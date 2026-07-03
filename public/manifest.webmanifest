@@ -1,0 +1,17 @@
+{
+  "name": "にほんちずたんけん",
+  "short_name": "ちずたんけん",
+  "description": "小学生向け日本地図学習アプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0f4ff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -18,7 +18,7 @@ export function RegionSelect({ onBack, onSelect, onSwitchPlayer }: RegionSelectP
 
       <PlayerStatus onSwitchPlayer={onSwitchPlayer} />
 
-      <p className="region-intro">まず地方ごとに都道府県を覚えよう！全部マスターしたらクイズが解放されるよ</p>
+      <p className="region-intro">地方ごとに都道府県を覚えよう！クイズはいつでも挑戦できるよ</p>
 
       <div className="region-grid">
         {studyRegions.map((region) => {

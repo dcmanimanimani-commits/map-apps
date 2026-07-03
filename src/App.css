@@ -1178,6 +1178,71 @@
   gap: 0.35rem;
 }
 
+.kanji-mode-intro {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.kanji-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0 0.25rem;
+}
+
+.kanji-mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.25rem 0.75rem;
+  border: none;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.kanji-mode-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+}
+
+.kanji-mode-emoji {
+  font-size: 2rem;
+}
+
+.kanji-mode-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.kanji-mode-desc {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.kanji-mode-badge {
+  font-size: 0.72rem;
+  color: #6366f1;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.region-grid.compact {
+  gap: 0.5rem;
+}
+
+.learn-nav-top {
+  margin-bottom: 0.5rem;
+}
+
 .hanzi-area {
   flex: 1;
   display: flex;
@@ -1193,6 +1258,14 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   touch-action: none;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.hanzi-canvas svg {
+  touch-action: none;
+  pointer-events: all;
 }
 
 .hanzi-canvas-lg {

@@ -9,11 +9,20 @@ declare module 'hanzi-writer' {
     drawingColor?: string;
     drawingWidth?: number;
     highlightColor?: string;
+    leniency?: number;
+    averageDistanceThreshold?: number;
+    showHintAfterMisses?: number | false;
+    markStrokeCorrectAfterMisses?: number | false;
+    acceptBackwardsStrokes?: boolean;
   }
 
   interface QuizOptions {
-    showHintAfterMisses?: number;
+    showHintAfterMisses?: number | false;
     highlightOnComplete?: boolean;
+    leniency?: number;
+    averageDistanceThreshold?: number;
+    markStrokeCorrectAfterMisses?: number | false;
+    acceptBackwardsStrokes?: boolean;
     onComplete?: () => void;
     onCorrectStroke?: (data: unknown) => void;
   }
