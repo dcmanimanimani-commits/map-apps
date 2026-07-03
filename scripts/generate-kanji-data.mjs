@@ -1,17 +1,27 @@
 /**
- * KanjiVG SVG → hanzi-writer JSON（日本語専用漢字用）
+ * 全都道府県の漢字を KanjiVG（日本の書き順）から hanzi-writer 用 JSON を生成
  */
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const SCALE = 1024 / 109;
-const CHARS = [
-  { char: '児', code: '05150' },
-  { char: '広', code: '05e83' },
-  { char: '徳', code: '05fb3' },
-  { char: '栃', code: '06803' },
-  { char: '縄', code: '07e04' },
+
+const PREFS = [
+  '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+  '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+  '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+  '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+  '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+  '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+  '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
 ];
+
+export const PREFECTURE_KANJI = [...new Set(PREFS.flatMap((p) => [...p]))].sort();
+
+function toCode(char) {
+  return char.codePointAt(0).toString(16).padStart(5, '0');
+}
 
 function scale(n) {
   return Math.round(Number(n) * SCALE);
@@ -21,14 +31,14 @@ function tokenizePath(d) {
   return d.match(/[a-zA-Z]|-?\d+(?:\.\d+)?/g) ?? [];
 }
 
-function scalePath(d) {
+export function scalePath(d) {
   const tokens = tokenizePath(d);
   return tokens
     .map((t) => (/^[a-zA-Z]$/.test(t) ? t : String(scale(t))))
     .join(' ');
 }
 
-function pathToPoints(d) {
+export function pathToPoints(d) {
   const tokens = tokenizePath(d);
   const points = [];
   let i = 0;
@@ -41,9 +51,7 @@ function pathToPoints(d) {
   const readNum = () => Number(tokens[i++]);
 
   const addPoint = (x, y) => {
-    const px = scale(x);
-    const py = scale(y);
-    points.push([px, py]);
+    points.push([scale(x), scale(y)]);
     cx = x;
     cy = y;
   };
@@ -94,11 +102,10 @@ function pathToPoints(d) {
         i += 2;
         addPoint(readNum(), readNum());
         break;
-      case 'q': {
+      case 'q':
         i += 2;
         addPoint(cx + readNum(), cy + readNum());
         break;
-      }
       case 'H':
         addPoint(readNum(), cy);
         break;
@@ -124,10 +131,9 @@ function pathToPoints(d) {
   return points;
 }
 
-function buildMedian(points) {
+export function buildMedian(points) {
   if (points.length === 0) return [[512, 512]];
-  if (points.length === 1) return points;
-  if (points.length === 2) return points;
+  if (points.length <= 2) return points;
 
   const median = [points[0]];
   const mid = points[Math.floor(points.length / 2)];
@@ -137,14 +143,15 @@ function buildMedian(points) {
   return median;
 }
 
-async function fetchSvg(code) {
+export async function fetchKanjiSvg(char) {
+  const code = toCode(char);
   const url = `https://raw.githubusercontent.com/KanjiVG/kanjivg/master/kanji/${code}.svg`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed ${code}: ${res.status}`);
+  if (!res.ok) throw new Error(`KanjiVG not found: ${char} (${code})`);
   return res.text();
 }
 
-function parseStrokes(svg) {
+export function parseStrokes(svg) {
   const re = /<path[^>]*id="kvg:[^"]*-s(\d+)"[^>]*d="([^"]+)"/g;
   const strokes = [];
   let match;
@@ -155,24 +162,41 @@ function parseStrokes(svg) {
   return strokes;
 }
 
+export function kanjiSvgToWriterData(svg) {
+  const parsed = parseStrokes(svg);
+  return {
+    strokes: parsed.map((s) => scalePath(s.d)),
+    medians: parsed.map((s) => buildMedian(pathToPoints(s.d))),
+  };
+}
+
 async function main() {
   const outDir = path.join('public', 'kanji-data');
   fs.mkdirSync(outDir, { recursive: true });
 
-  for (const { char, code } of CHARS) {
-    const svg = await fetchSvg(code);
-    const parsed = parseStrokes(svg);
-    const data = {
-      strokes: parsed.map((s) => scalePath(s.d)),
-      medians: parsed.map((s) => buildMedian(pathToPoints(s.d))),
-    };
-    const file = path.join(outDir, `${char}.json`);
-    fs.writeFileSync(file, JSON.stringify(data));
-    console.log(`${char}: ${parsed.length} strokes -> ${file}`);
+  const failures = [];
+  for (const char of PREFECTURE_KANJI) {
+    try {
+      const svg = await fetchKanjiSvg(char);
+      const data = kanjiSvgToWriterData(svg);
+      const file = path.join(outDir, `${char}.json`);
+      fs.writeFileSync(file, JSON.stringify(data));
+      console.log(`${char}: ${data.strokes.length} strokes`);
+    } catch (err) {
+      failures.push({ char, err: err.message });
+      console.error(`${char}: FAILED - ${err.message}`);
+    }
   }
+
+  if (failures.length) {
+    process.exit(1);
+  }
+  console.log(`Generated ${PREFECTURE_KANJI.length} kanji files.`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

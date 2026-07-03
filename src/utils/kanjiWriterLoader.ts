@@ -1,9 +1,3 @@
-const HANZI_DATA_VERSION = '2.0.1';
-const CDN_BASE = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@${HANZI_DATA_VERSION}`;
-
-/** hanzi-writer CDN に無い日本語用漢字 */
-export const LOCAL_KANJI_CHARS = new Set(['児', '広', '徳', '栃', '縄']);
-
 export interface KanjiCharacterJson {
   strokes: string[];
   medians: number[][][];
@@ -18,13 +12,10 @@ async function fetchJson(url: string): Promise<KanjiCharacterJson> {
   return res.json() as Promise<KanjiCharacterJson>;
 }
 
+/** 日本の書き順（KanjiVG）データを常に使用 */
 export function createKanjiCharDataLoader() {
   return (char: string, onLoad: LoaderCallback, onError: ErrorCallback) => {
-    const url = LOCAL_KANJI_CHARS.has(char)
-      ? `/kanji-data/${encodeURIComponent(char)}.json`
-      : `${CDN_BASE}/${encodeURIComponent(char)}.json`;
-
-    fetchJson(url)
+    fetchJson(`/kanji-data/${encodeURIComponent(char)}.json`)
       .then(onLoad)
       .catch(onError);
   };
