@@ -1,12 +1,12 @@
 /**
  * 全都道府県漢字データを生成
  * - 基本: @k1low/hanzi-writer-data-jp（表示・手書き品質が安定）
- * - 例外: 縄のみ日本式いとへんに差し替え
+ * - 例外: 縄のみ日本式いとへんに差し替え、北は右側「比」のみ日本式に差し替え
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { fixNawaStrokeData, loadSubAnimJOverrides } from './kanjivg-converter.mjs';
+import { fixKitaStrokeData, fixNawaStrokeData, loadSubAnimJOverrides } from './kanjivg-converter.mjs';
 
 const JP_BASE = 'https://unpkg.com/@k1low/hanzi-writer-data-jp@0.8.0';
 
@@ -37,10 +37,12 @@ async function main() {
   for (const char of PREFECTURE_KANJI) {
     const data = char === '縄'
       ? await fixNawaStrokeData(subAnimJ)
-      : await fetchJpData(char);
+      : char === '北'
+        ? await fixKitaStrokeData()
+        : await fetchJpData(char);
 
     fs.writeFileSync(path.join(outDir, `${char}.json`), JSON.stringify(data));
-    const tag = char === '縄' ? ' (糸偏修正)' : '';
+    const tag = char === '縄' ? ' (糸偏修正)' : char === '北' ? ' (比修正)' : '';
     console.log(`${char}: ${data.strokes.length} strokes${tag}`);
   }
 
