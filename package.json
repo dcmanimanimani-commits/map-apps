@@ -16,6 +16,7 @@
     "hanzi-writer": "^3.7.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "svg-path-parser": "^1.1.0",
     "topojson-client": "^3.1.0"
   },
   "devDependencies": {

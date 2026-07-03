@@ -1,12 +1,17 @@
 /**
- * @k1low/hanzi-writer-data-jp から全都道府県漢字データを取得
- * （日本の書き順・HanziWriter 正式フォーマット）
+ * 全都道府県漢字を日本の書き順データで生成
+ * - 基本: KanjiVG（Moritz72 変換）
+ * - 上書き: subAnimJ（小学校向け修正）
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-const JP_BASE = 'https://unpkg.com/@k1low/hanzi-writer-data-jp@0.8.0';
+import {
+  fetchKanjiVgSvg,
+  kanjiVgSvgToWriterData,
+  loadSubAnimJOverrides,
+  fixNawaStrokeData,
+} from './kanjivg-converter.mjs';
 
 const PREFS = [
   '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
@@ -24,16 +29,38 @@ async function main() {
   const outDir = path.join('public', 'kanji-data');
   fs.mkdirSync(outDir, { recursive: true });
 
+  const subAnimJ = await loadSubAnimJOverrides();
+  const usedOverride = [];
+  const usedFix = [];
+
   for (const char of PREFECTURE_KANJI) {
-    const url = `${JP_BASE}/${encodeURIComponent(char)}.json`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed ${char}: ${res.status}`);
-    const data = await res.json();
+    let data;
+    let tag = '';
+
+    if (char === '縄') {
+      data = await fixNawaStrokeData(subAnimJ);
+      tag = ' (糸偏修正)';
+      usedFix.push(char);
+    } else if (subAnimJ.has(char)) {
+      data = subAnimJ.get(char);
+      tag = ' (subAnimJ)';
+      usedOverride.push(char);
+    } else {
+      const svg = await fetchKanjiVgSvg(char);
+      data = kanjiVgSvgToWriterData(svg);
+    }
+
     fs.writeFileSync(path.join(outDir, `${char}.json`), JSON.stringify(data));
-    console.log(`${char}: ${data.strokes.length} strokes`);
+    console.log(`${char}: ${data.strokes.length} strokes${tag}`);
   }
 
-  console.log(`Downloaded ${PREFECTURE_KANJI.length} kanji files.`);
+  console.log(`Generated ${PREFECTURE_KANJI.length} kanji files.`);
+  if (usedOverride.length) {
+    console.log('subAnimJ overrides:', usedOverride.join(''));
+  }
+  if (usedFix.length) {
+    console.log('manual fixes:', usedFix.join(''));
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
