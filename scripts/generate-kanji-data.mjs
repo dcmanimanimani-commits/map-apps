@@ -1,17 +1,14 @@
 /**
- * 全都道府県漢字を日本の書き順データで生成
- * - 基本: KanjiVG（Moritz72 変換）
- * - 上書き: subAnimJ（小学校向け修正）
+ * 全都道府県漢字データを生成
+ * - 基本: @k1low/hanzi-writer-data-jp（表示・手書き品質が安定）
+ * - 例外: 縄のみ日本式いとへんに差し替え
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import {
-  fetchKanjiVgSvg,
-  kanjiVgSvgToWriterData,
-  loadSubAnimJOverrides,
-  fixNawaStrokeData,
-} from './kanjivg-converter.mjs';
+import { fixNawaStrokeData, loadSubAnimJOverrides } from './kanjivg-converter.mjs';
+
+const JP_BASE = 'https://unpkg.com/@k1low/hanzi-writer-data-jp@0.8.0';
 
 const PREFS = [
   '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
@@ -25,42 +22,29 @@ const PREFS = [
 
 export const PREFECTURE_KANJI = [...new Set(PREFS.flatMap((p) => [...p]))].sort();
 
+async function fetchJpData(char) {
+  const res = await fetch(`${JP_BASE}/${encodeURIComponent(char)}.json`);
+  if (!res.ok) throw new Error(`Failed ${char}: ${res.status}`);
+  return res.json();
+}
+
 async function main() {
   const outDir = path.join('public', 'kanji-data');
   fs.mkdirSync(outDir, { recursive: true });
 
   const subAnimJ = await loadSubAnimJOverrides();
-  const usedOverride = [];
-  const usedFix = [];
 
   for (const char of PREFECTURE_KANJI) {
-    let data;
-    let tag = '';
-
-    if (char === '縄') {
-      data = await fixNawaStrokeData(subAnimJ);
-      tag = ' (糸偏修正)';
-      usedFix.push(char);
-    } else if (subAnimJ.has(char)) {
-      data = subAnimJ.get(char);
-      tag = ' (subAnimJ)';
-      usedOverride.push(char);
-    } else {
-      const svg = await fetchKanjiVgSvg(char);
-      data = kanjiVgSvgToWriterData(svg);
-    }
+    const data = char === '縄'
+      ? await fixNawaStrokeData(subAnimJ)
+      : await fetchJpData(char);
 
     fs.writeFileSync(path.join(outDir, `${char}.json`), JSON.stringify(data));
+    const tag = char === '縄' ? ' (糸偏修正)' : '';
     console.log(`${char}: ${data.strokes.length} strokes${tag}`);
   }
 
   console.log(`Generated ${PREFECTURE_KANJI.length} kanji files.`);
-  if (usedOverride.length) {
-    console.log('subAnimJ overrides:', usedOverride.join(''));
-  }
-  if (usedFix.length) {
-    console.log('manual fixes:', usedFix.join(''));
-  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

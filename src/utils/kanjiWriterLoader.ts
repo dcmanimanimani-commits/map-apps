@@ -12,7 +12,7 @@ async function fetchJson(url: string): Promise<KanjiCharacterJson> {
   return res.json() as Promise<KanjiCharacterJson>;
 }
 
-/** 日本の書き順データ（KanjiVG + subAnimJ + 手修正）を同梱 */
+/** 日本の書き順データ（hanzi-writer-data-jp + 縄の糸偏修正） */
 export function createKanjiCharDataLoader() {
   return (char: string, onLoad: LoaderCallback, onError: ErrorCallback) => {
     fetchJson(`/kanji-data/${encodeURIComponent(char)}.json`)
