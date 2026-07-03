@@ -14,6 +14,8 @@ declare module 'hanzi-writer' {
     showHintAfterMisses?: number | false;
     markStrokeCorrectAfterMisses?: number | false;
     acceptBackwardsStrokes?: boolean;
+    charDataLoader?: (char: string, onLoad: (data: unknown) => void, onError: (err?: unknown) => void) => void;
+    onLoadCharDataError?: (err?: unknown) => void;
   }
 
   interface QuizOptions {

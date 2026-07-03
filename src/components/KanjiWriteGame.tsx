@@ -6,6 +6,7 @@ import {
   type Prefecture,
 } from '../data/prefectures';
 import { getStudyRegion, studyRegions } from '../data/regions';
+import { createKanjiCharDataLoader } from '../utils/kanjiWriterLoader';
 import { FeedbackBanner } from './FeedbackBanner';
 
 interface KanjiWriteGameProps {
@@ -43,6 +44,7 @@ function writerOptions(size: number) {
     showHintAfterMisses: 1 as const,
     markStrokeCorrectAfterMisses: 4 as const,
     acceptBackwardsStrokes: true,
+    charDataLoader: createKanjiCharDataLoader(),
   };
 }
 
