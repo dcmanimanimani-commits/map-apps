@@ -9,4 +9,19 @@ if (missing.length) {
   console.error('MISSING:', missing.join(''));
   process.exit(1);
 }
-console.log(`OK: all ${PREFECTURE_KANJI.length} kanji data files present`);
+
+// 最低限の形式チェック
+const broken = [];
+for (const char of PREFECTURE_KANJI) {
+  const data = JSON.parse(fs.readFileSync(path.join(outDir, `${char}.json`), 'utf8'));
+  if (!data.strokes?.length || !data.medians?.length) {
+    broken.push(char);
+  }
+}
+
+if (broken.length) {
+  console.error('BROKEN:', broken.join(''));
+  process.exit(1);
+}
+
+console.log(`OK: all ${PREFECTURE_KANJI.length} kanji data files valid`);
