@@ -524,7 +524,7 @@
 .info-details {
   display: grid;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .info-details dt {
@@ -539,67 +539,71 @@
   color: #334155;
 }
 
-.kanji-breakdown {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
+.explore-sidebar {
+  min-height: 0;
+  overflow: hidden;
 }
 
-.breakdown-title {
-  font-weight: 800;
-  font-size: 0.9rem;
-  color: #475569;
-  margin-bottom: 0.25rem;
-}
-
-.breakdown-text {
-  font-size: 0.95rem;
-  color: #64748b;
-  line-height: 1.6;
-}
-
-.prefecture-list {
-  background: white;
-  border-radius: 20px;
-  padding: 1rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.list-title {
-  font-weight: 800;
-  font-size: 0.9rem;
-  color: #475569;
-  margin-bottom: 0.75rem;
-}
-
-.list-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-}
-
-.list-item {
-  background: #f1f5f9;
-  border-radius: 10px;
-  padding: 0.4rem 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #475569;
+.explore-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  transition: background 0.15s;
-  border: 2px solid transparent;
+  min-height: 0;
+  max-height: calc(100dvh - 200px);
 }
 
-.list-item:hover,
-.list-item.active {
-  background: #e0e7ff;
-  border-color: #6366f1;
-  color: #3730a3;
+.landmark-guide {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.landmark-guide-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #1e3a5f;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.landmark-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.landmark-card {
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.landmark-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.landmark-card-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.landmark-card-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #334155;
+}
+
+.landmark-card-desc {
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.65;
 }
 
 /* iPad 横向き・大画面：地図クイズのみサイドバー＋地図 */
@@ -650,14 +654,12 @@
   }
 
   .explore-screen .game-sidebar {
-    width: 300px;
+    width: 320px;
     max-height: calc(100dvh - 80px);
   }
 
-  .explore-screen .prefecture-list {
-    max-height: none;
-    flex: 1;
-    overflow-y: auto;
+  .explore-info {
+    max-height: calc(100dvh - 100px);
   }
 
   .btn-back {

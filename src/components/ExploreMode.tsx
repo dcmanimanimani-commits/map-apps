@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
-import { prefectureByKanji, prefectures } from '../data/prefectures';
+import { prefectureByKanji } from '../data/prefectures';
+import { getLandmarkSpots } from '../data/landmarkDetails';
 import { JapanMap } from './JapanMap';
 
 interface ExploreModeProps {
@@ -11,13 +12,14 @@ interface ExploreModeProps {
 export function ExploreMode({ geo, onBack }: ExploreModeProps) {
   const [selectedKanji, setSelectedKanji] = useState<string | null>(null);
   const selected = selectedKanji ? prefectureByKanji.get(selectedKanji) : null;
+  const spots = selected ? getLandmarkSpots(selected.kanji) : [];
 
   return (
     <div className="game-screen explore-screen">
       <header className="game-header">
         <button className="btn-back" onClick={onBack}>← もどる</button>
         <h2>🔍 地図でべんきょう</h2>
-        <p className="game-desc">地図をタップして、都道府県の名前・名物・漢字を覚えよう！</p>
+        <p className="game-desc">地図をタップして、都道府県の名前と名物・名所を覚えよう！</p>
       </header>
 
       <div className="explore-layout game-play-area">
@@ -29,9 +31,9 @@ export function ExploreMode({ geo, onBack }: ExploreModeProps) {
           />
         </div>
 
-        <div className="info-panel game-sidebar">
+        <div className="info-panel game-sidebar explore-sidebar">
           {selected ? (
-            <div className="prefecture-info">
+            <div className="prefecture-info explore-info">
               <div className="info-header">
                 <span className="info-emoji">{selected.landmarkEmoji}</span>
                 <div>
@@ -44,41 +46,29 @@ export function ExploreMode({ geo, onBack }: ExploreModeProps) {
                   <dt>地方</dt>
                   <dd>{selected.region}</dd>
                 </div>
-                <div>
-                  <dt>名物・名所</dt>
-                  <dd>{selected.landmark}</dd>
-                </div>
               </dl>
-              <div className="kanji-breakdown">
-                <p className="breakdown-title">📝 漢字のポイント</p>
-                <p className="breakdown-text">
-                  「{selected.kanji}」を書いてみよう！
-                  読み方は「{selected.hiragana}」だよ。
-                </p>
+
+              <div className="landmark-guide">
+                <p className="landmark-guide-title">🍜 名物・名所をくわしく</p>
+                <div className="landmark-cards">
+                  {spots.map((spot) => (
+                    <article key={spot.name} className="landmark-card">
+                      <div className="landmark-card-header">
+                        <span className="landmark-card-emoji">{spot.emoji}</span>
+                        <h4 className="landmark-card-name">{spot.name}</h4>
+                      </div>
+                      <p className="landmark-card-desc">{spot.description}</p>
+                    </article>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
             <div className="prefecture-info empty-info">
               <p>👆 地図の都道府県をタップしてね！</p>
-              <p className="sub-text">47都道府県ぜんぶあるよ</p>
+              <p className="sub-text">名物・名所のくわしい話が読めるよ</p>
             </div>
           )}
-
-          <div className="prefecture-list">
-            <p className="list-title">📋 都道府県いちらん</p>
-            <div className="list-grid">
-              {prefectures.map((p) => (
-                <button
-                  key={p.id}
-                  className={`list-item ${selectedKanji === p.kanji ? 'active' : ''}`}
-                  onClick={() => setSelectedKanji(p.kanji)}
-                >
-                  <span>{p.landmarkEmoji}</span>
-                  <span>{p.kanji.replace(/[都道府県]/g, '')}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
