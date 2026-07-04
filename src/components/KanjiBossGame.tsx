@@ -7,6 +7,9 @@ import { preloadBossKanjiMasks } from '../utils/kanjiMatch';
 import { HybridKanjiPad, type HybridKanjiPadHandle } from './HybridKanjiPad';
 import { KanjiGlyph } from './KanjiGlyph';
 import { FeedbackBanner } from './FeedbackBanner';
+import { PlayerAvatar } from './PlayerAvatar';
+import { usePlayer } from '../context/PlayerContext';
+import { resolveAvatarLevel } from '../data/progress';
 
 interface KanjiBossGameProps {
   onBack: () => void;
@@ -25,16 +28,19 @@ const MORPH_MS = 900;
 function usePadSize() {
   return useMemo(() => {
     const w = window.innerWidth;
-    const btnCol = 112;
+    const sideCol = 112;
+    const avatarCol = 88;
     const gap = 8;
-    const edgePad = 20;
-    const maxPad = w - btnCol - gap - edgePad;
-    return Math.floor(Math.min(292, Math.max(200, Math.min(w * 0.5, maxPad))));
+    const edgePad = 16;
+    const maxPad = w - sideCol - avatarCol - gap * 2 - edgePad;
+    return Math.floor(Math.min(292, Math.max(200, Math.min(w * 0.46, maxPad))));
   }, []);
 }
 
 export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const useScribble = useMemo(() => supportsAppleScribble(), []);
+  const { activePlayer } = usePlayer();
+  const avatarLevel = activePlayer ? resolveAvatarLevel(activePlayer.progress) : 1;
 
   const [phase, setPhase] = useState<Phase>('intro');
   const [questions, setQuestions] = useState<KanjiBossQuestion[]>([]);
@@ -305,6 +311,18 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
 
   if (!question || !expectedChar) return null;
 
+  const cheerText =
+    attackFx === 'hit' ? 'やったー！' :
+    attackFx === 'deflect' ? 'もう一度！' :
+    morphChar ? 'いいね！' :
+    feedback.type === 'error' ? 'だいじょうぶ！' :
+    'がんばれ！';
+
+  const cheerClass =
+    attackFx === 'hit' ? 'boss-cheer--celebrate' :
+    attackFx === 'deflect' ? 'boss-cheer--wince' :
+    'boss-cheer--idle';
+
   return (
     <div className="game-screen kanji-write-screen boss-screen boss-screen--play">
       <header className="game-header compact boss-play-header">
@@ -401,6 +419,11 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
         className="boss-write-row"
         style={{ '--boss-pad-size': `${padSize}px` } as React.CSSProperties}
       >
+        <div className={`boss-cheer-slot ${cheerClass}`}>
+          <PlayerAvatar level={avatarLevel} size="cheer" className="boss-cheer-avatar" />
+          <p className="boss-cheer-text">{cheerText}</p>
+        </div>
+
         <div className="boss-pad-slot">
           <div className="freehand-pad-wrap" style={{ width: padSize, height: padSize }}>
             {morphChar ? (
