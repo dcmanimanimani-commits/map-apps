@@ -7,13 +7,14 @@ import {
 } from '../data/prefectures';
 import { getStudyRegion, studyRegions } from '../data/regions';
 import { createKanjiCharDataLoader } from '../utils/kanjiWriterLoader';
+import { KanjiBossGame } from './KanjiBossGame';
 import { FeedbackBanner } from './FeedbackBanner';
 
 interface KanjiWriteGameProps {
   onBack: () => void;
 }
 
-type Phase = 'select-mode' | 'select-region' | 'play' | 'finish';
+type Phase = 'select-mode' | 'select-region' | 'play' | 'finish' | 'boss';
 type GameMode = 'regional' | 'national';
 
 function useWriterSize() {
@@ -153,6 +154,10 @@ export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
     return '';
   }, [mode, regionId]);
 
+  if (phase === 'boss') {
+    return <KanjiBossGame onBack={() => setPhase('select-mode')} />;
+  }
+
   if (phase === 'select-mode') {
     return (
       <div className="game-screen kanji-write-screen">
@@ -163,7 +168,7 @@ export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
 
         <p className="kanji-mode-intro">モードをえらんでね。どの県も1回ずつ出るよ！</p>
 
-        <div className="kanji-mode-grid">
+        <div className="kanji-mode-grid kanji-mode-grid--3">
           <button
             className="kanji-mode-card"
             onClick={() => setPhase('select-region')}
@@ -179,6 +184,14 @@ export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
             <span className="kanji-mode-emoji">🎲</span>
             <span className="kanji-mode-title">全国ランダム</span>
             <span className="kanji-mode-desc">全国からランダムに20問</span>
+          </button>
+          <button
+            className="kanji-mode-card kanji-mode-card--boss"
+            onClick={() => setPhase('boss')}
+          >
+            <span className="kanji-mode-emoji">👹</span>
+            <span className="kanji-mode-title">ボスたたき</span>
+            <span className="kanji-mode-desc">クイズに漢字で答えて攻撃！</span>
           </button>
         </div>
       </div>
