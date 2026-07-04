@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePlayer } from '../context/PlayerContext';
+import { resolveAvatarLevel } from '../data/progress';
 import { PlayerAvatar } from './PlayerAvatar';
 
 interface PlayerSelectProps {
@@ -48,7 +49,7 @@ export function PlayerSelect({ onReady, allowBack, onBack }: PlayerSelectProps) 
             className="player-card"
             onClick={() => handleSelect(player.id)}
           >
-            <PlayerAvatar title={player.progress.title} size="md" />
+            <PlayerAvatar level={resolveAvatarLevel(player.progress)} size="lg" />
             <div className="player-card-info">
               <span className="player-card-name">{player.name}</span>
               <span className="player-card-title">{player.progress.title}</span>

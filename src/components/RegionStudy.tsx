@@ -6,6 +6,7 @@ import { getStudyRegion } from '../data/regions';
 import { JapanMap } from './JapanMap';
 import { FeedbackBanner } from './FeedbackBanner';
 import { PlayerStatus } from './PlayerStatus';
+import { getTitleLevel } from '../data/progress';
 import { PlayerAvatar } from './PlayerAvatar';
 
 interface RegionStudyProps {
@@ -129,7 +130,11 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
     return (
       <div className="game-screen">
         <div className="clear-card">
-          <PlayerAvatar title={newTitle ?? undefined} size="lg" className="clear-avatar" />
+          <PlayerAvatar
+            level={getTitleLevel(newTitle ?? '') as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}
+            size="xl"
+            className="clear-avatar"
+          />
           <span className="clear-emoji">🏆</span>
           <h2>{regionLabel}マスター！</h2>
           <p>レベルアップ！称号がもらえたよ</p>

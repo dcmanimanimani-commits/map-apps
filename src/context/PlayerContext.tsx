@@ -14,7 +14,8 @@ import {
   type PlayerSlot,
 } from '../data/players';
 import type { PlayerProgress } from '../data/progress';
-import { masterRegion as masterRegionProgress } from '../data/progress';
+import { masterRegion as masterRegionProgress, setSelectedAvatar } from '../data/progress';
+import type { AvatarLevel } from '../data/characterAssets';
 
 interface PlayerContextValue {
   activePlayer: PlayerSlot | null;
@@ -23,6 +24,7 @@ interface PlayerContextValue {
   selectPlayer: (id: string) => void;
   addPlayer: (name: string) => PlayerSlot;
   masterRegion: (regionId: string) => PlayerProgress;
+  setAvatar: (level: AvatarLevel) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -54,6 +56,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const updated = masterRegionProgress(regionId);
         refresh();
         return updated;
+      },
+      setAvatar: (level: AvatarLevel) => {
+        setSelectedAvatar(level);
+        refresh();
       },
     };
   }, [version, refresh]);

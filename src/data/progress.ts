@@ -1,3 +1,4 @@
+import type { AvatarLevel } from './characterAssets';
 import { getProgressKey } from './regions';
 import { getActiveProgress, saveActiveProgress } from './players';
 
@@ -6,6 +7,8 @@ export interface PlayerProgress {
   xp: number;
   masteredRegions: string[];
   title: string;
+  /** 表示中のアバター（獲得済み称号の範囲内で自由選択） */
+  avatarLevel?: AvatarLevel;
 }
 
 export const TITLES: { minLevel: number; title: string }[] = [
@@ -29,6 +32,27 @@ export function getTitleForLevel(level: number): string {
 
 export function getTitleLevel(title: string): number {
   return TITLES.find((t) => t.title === title)?.minLevel ?? 1;
+}
+
+export function getMaxUnlockedAvatarLevel(level: number): AvatarLevel {
+  return Math.min(Math.max(1, level), 8) as AvatarLevel;
+}
+
+export function resolveAvatarLevel(progress: PlayerProgress): AvatarLevel {
+  const maxUnlocked = getMaxUnlockedAvatarLevel(progress.level);
+  const fallback = getTitleLevel(progress.title) as AvatarLevel;
+  const selected = progress.avatarLevel ?? fallback;
+  return Math.min(Math.max(1, selected), maxUnlocked) as AvatarLevel;
+}
+
+export function setSelectedAvatar(avatarLevel: AvatarLevel): PlayerProgress {
+  const progress = loadProgress();
+  const maxUnlocked = getMaxUnlockedAvatarLevel(progress.level);
+  if (avatarLevel > maxUnlocked) return progress;
+
+  const updated: PlayerProgress = { ...progress, avatarLevel };
+  saveActiveProgress(updated);
+  return updated;
 }
 
 /** 旧データ形式のマイグレーション（純粋関数） */
@@ -57,7 +81,11 @@ export function migrateProgress(progress: PlayerProgress): PlayerProgress {
     migrated = { ...migrated, masteredRegions };
   }
 
-  return migrated;
+  const maxUnlocked = getMaxUnlockedAvatarLevel(migrated.level);
+  let avatarLevel = migrated.avatarLevel ?? (getTitleLevel(migrated.title) as AvatarLevel);
+  avatarLevel = Math.min(Math.max(1, avatarLevel), maxUnlocked) as AvatarLevel;
+
+  return { ...migrated, avatarLevel };
 }
 
 export function loadProgress(): PlayerProgress {
@@ -90,7 +118,8 @@ export function masterRegion(regionId: string, subRegionId?: string): PlayerProg
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
   const title = getTitleForLevel(level);
 
-  const updated: PlayerProgress = { level, xp, masteredRegions, title };
+  const avatarLevel = resolveAvatarLevel({ ...progress, level, xp, masteredRegions, title });
+  const updated: PlayerProgress = { level, xp, masteredRegions, title, avatarLevel };
   saveActiveProgress(updated);
   return updated;
 }

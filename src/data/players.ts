@@ -21,7 +21,7 @@ const STORAGE_KEY = 'nihon-chizu-players';
 const LEGACY_KEY = 'nihon-chizu-progress';
 
 function defaultProgress(): PlayerProgress {
-  return { level: 1, xp: 0, masteredRegions: [], title: TITLES[0].title };
+  return { level: 1, xp: 0, masteredRegions: [], title: TITLES[0].title, avatarLevel: 1 };
 }
 
 function loadStore(): PlayersStore {

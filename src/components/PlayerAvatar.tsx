@@ -6,7 +6,7 @@ export type { AvatarLevel };
 interface PlayerAvatarProps {
   level?: AvatarLevel;
   title?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'picker';
   className?: string;
 }
 
@@ -16,10 +16,12 @@ function resolveLevel(level?: AvatarLevel, title?: string): AvatarLevel {
   return 1;
 }
 
-function sizePx(size: 'sm' | 'md' | 'lg'): number {
-  if (size === 'lg') return 96;
-  if (size === 'sm') return 48;
-  return 72;
+function sizePx(size: 'sm' | 'md' | 'lg' | 'xl' | 'picker'): number {
+  if (size === 'xl') return 168;
+  if (size === 'lg') return 136;
+  if (size === 'picker') return 88;
+  if (size === 'sm') return 72;
+  return 104;
 }
 
 export function PlayerAvatar({ level, title, size = 'md', className = '' }: PlayerAvatarProps) {
