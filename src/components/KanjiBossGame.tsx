@@ -41,7 +41,8 @@ function useCheerSize(padSize: number) {
     const w = window.innerWidth;
     const sideCol = 108;
     const leftSpace = (w - padSize - sideCol - 24) / 2;
-    return Math.floor(Math.min(320, Math.max(200, leftSpace * 0.92)));
+    const raw = Math.min(320, Math.max(200, leftSpace * 0.92));
+    return Math.floor(raw * 0.8);
   }, [padSize]);
 }
 
