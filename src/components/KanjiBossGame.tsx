@@ -233,7 +233,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       setMistakes(next);
       triggerDeflect(useScribble ? (writtenChar || '？') : '？');
       clearPad();
-      if (useScribble) scribbleRef.current?.blur();
+      if (useScribble) scribbleRef.current?.focus();
       setLocked(false);
       firingRef.current = false;
       if (next >= MAX_MISTAKES) {
@@ -410,7 +410,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           {morphChar
             ? '✨ 活字（かつじ）に変（か）わってる…'
             : useScribble
-              ? '白い紙をタップ → 書く → 活字になったら「打とう！」'
+              ? '白い紙に Pencil で1文字（もじ）書（か）こう！'
               : '白（しろ）い紙（かみ）に今（いま）の1文字（もじ）だけ書（か）いて！'}
         </p>
       </div>
