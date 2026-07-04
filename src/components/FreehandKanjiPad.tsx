@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { AUTO_IDLE_MS } from '../utils/kanjiMatch';
 
 export interface FreehandKanjiPadHandle {
   clear: () => void;
@@ -29,11 +30,15 @@ export const FreehandKanjiPad = forwardRef<FreehandKanjiPadHandle, FreehandKanji
     const onIdleRef = useRef(onIdle);
     onIdleRef.current = onIdle;
 
+    const clearSelection = () => {
+      window.getSelection()?.removeAllRanges();
+    };
+
     const scheduleIdle = () => {
       if (idleTimer.current) window.clearTimeout(idleTimer.current);
       idleTimer.current = window.setTimeout(() => {
         onIdleRef.current?.();
-      }, 650);
+      }, AUTO_IDLE_MS);
     };
 
     const clear = () => {
@@ -93,6 +98,26 @@ export const FreehandKanjiPad = forwardRef<FreehandKanjiPadHandle, FreehandKanji
       clear();
     }, [size]);
 
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const blockSelect = (e: Event) => e.preventDefault();
+      const blockTouchScroll = (e: TouchEvent) => {
+        if (drawing.current) e.preventDefault();
+      };
+
+      canvas.addEventListener('selectstart', blockSelect);
+      canvas.addEventListener('contextmenu', blockSelect);
+      document.addEventListener('touchmove', blockTouchScroll, { passive: false });
+
+      return () => {
+        canvas.removeEventListener('selectstart', blockSelect);
+        canvas.removeEventListener('contextmenu', blockSelect);
+        document.removeEventListener('touchmove', blockTouchScroll);
+      };
+    }, [size]);
+
     useEffect(() => () => {
       if (idleTimer.current) window.clearTimeout(idleTimer.current);
     }, []);
@@ -126,6 +151,7 @@ export const FreehandKanjiPad = forwardRef<FreehandKanjiPadHandle, FreehandKanji
       if (disabled) return;
       if (e.pointerType === 'touch' && !e.isPrimary) return;
       e.preventDefault();
+      clearSelection();
       if (idleTimer.current) window.clearTimeout(idleTimer.current);
       e.currentTarget.setPointerCapture(e.pointerId);
       drawing.current = true;
@@ -144,6 +170,7 @@ export const FreehandKanjiPad = forwardRef<FreehandKanjiPadHandle, FreehandKanji
     const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (!drawing.current || disabled) return;
       e.preventDefault();
+      clearSelection();
       const native = e.nativeEvent;
       const events = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : [native];
       for (const ev of events) {

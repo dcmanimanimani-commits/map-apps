@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getWriteKanjiChars } from '../data/prefectures';
 import { pickBossQuestions, type KanjiBossQuestion } from '../data/kanjiBossQuestions';
 import { matchFreehandKanji } from '../utils/kanjiMatch';
@@ -138,7 +138,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     });
   }, [question, goNextQuestion]);
 
-  const handleFire = useCallback(async () => {
+  const handleFire = useCallback(async (opts?: { auto?: boolean }) => {
     if (locked || firingRef.current || !expectedChar || morphChar) return;
     const canvas = padRef.current?.getCanvas();
     if (!canvas || !padRef.current?.hasInk()) return;
@@ -147,9 +147,14 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     setLocked(true);
 
     const snapshot = padRef.current.toDataURL();
-    const { ok } = await matchFreehandKanji(canvas, expectedChar);
+    const { ok } = await matchFreehandKanji(canvas, expectedChar, { auto: opts?.auto });
 
     if (!ok) {
+      if (opts?.auto) {
+        setLocked(false);
+        firingRef.current = false;
+        return;
+      }
       const next = mistakes + 1;
       setMistakes(next);
       triggerDeflect('？');
@@ -214,8 +219,19 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const handlePadIdle = useCallback(() => {
     if (locked || morphChar) return;
     if (!padRef.current?.hasInk()) return;
-    handleFire();
+    handleFire({ auto: true });
   }, [locked, morphChar, handleFire]);
+
+  useEffect(() => {
+    if (phase !== 'play') return;
+    const blockSelect = (e: Event) => e.preventDefault();
+    document.documentElement.classList.add('boss-no-select');
+    document.addEventListener('selectstart', blockSelect);
+    return () => {
+      document.documentElement.classList.remove('boss-no-select');
+      document.removeEventListener('selectstart', blockSelect);
+    };
+  }, [phase]);
 
   if (phase === 'intro') {
     return (
@@ -377,12 +393,12 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
         <p className="hanzi-hint">
           {morphChar
             ? '手書（てが）き → 活字（かつじ）！'
-            : 'ペンや指（ゆび）で書（か）く → 書（か）き終（お）わったら活字（かつじ）になる'}
+            : '全部（ぜんぶ）書（か）き終（お）わってから活字（かつじ）になる（途中（とちゅう）では反応（はんのう）しない）'}
         </p>
       </div>
 
       <div className="hanzi-actions">
-        <button className="btn-primary boss-fire-btn" type="button" onClick={handleFire} disabled={locked || !!morphChar}>
+        <button className="btn-primary boss-fire-btn" type="button" onClick={() => handleFire()} disabled={locked || !!morphChar}>
           🎯 打（う）とう！
         </button>
         <button

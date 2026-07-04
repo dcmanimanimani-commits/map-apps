@@ -2,8 +2,13 @@ import type { KanjiCharacterJson } from './kanjiWriterLoader';
 
 const GRID = 64;
 const MATCH_SIZE = 256;
-/** 小学生の手書き向けにゆるめ */
+/** 手動「打とう！」用 */
 const MATCH_THRESHOLD = 0.14;
+/** 自動認識は書き途中を避けるため厳しめ */
+const AUTO_RECALL_MIN = 0.36;
+const AUTO_INK_RATIO_MIN = 0.3;
+/** ペンを離してから自動判定まで（画数の多い字向け） */
+export const AUTO_IDLE_MS = 2200;
 
 const refCache = new Map<string, ImageData>();
 const charDataCache = new Map<string, KanjiCharacterJson>();
@@ -96,7 +101,12 @@ function normalizeMask(mask: Uint8Array): Uint8Array {
   return out;
 }
 
-function matchScore(userMask: Uint8Array, refMask: Uint8Array): number {
+function matchScore(userMask: Uint8Array, refMask: Uint8Array): {
+  score: number;
+  recall: number;
+  userInk: number;
+  refInk: number;
+} {
   let inter = 0;
   let userInk = 0;
   let refInk = 0;
@@ -105,12 +115,13 @@ function matchScore(userMask: Uint8Array, refMask: Uint8Array): number {
     if (refMask[i]) refInk++;
     if (userMask[i] && refMask[i]) inter++;
   }
-  if (userInk < 12) return 0;
+  if (userInk < 12) return { score: 0, recall: 0, userInk, refInk };
   const union = userInk + refInk - inter;
   const iou = union === 0 ? 0 : inter / union;
   const recall = refInk === 0 ? 0 : inter / refInk;
   const precision = userInk === 0 ? 0 : inter / userInk;
-  return Math.max(iou, recall * 0.55, precision * 0.35);
+  const score = Math.max(iou, recall * 0.55, precision * 0.35);
+  return { score, recall, userInk, refInk };
 }
 
 function canvasHasInk(canvas: HTMLCanvasElement): boolean {
@@ -174,9 +185,10 @@ async function renderReference(char: string): Promise<ImageData> {
 export async function matchFreehandKanji(
   canvas: HTMLCanvasElement,
   expectedChar: string,
-): Promise<{ ok: boolean; score: number }> {
+  options?: { auto?: boolean },
+): Promise<{ ok: boolean; score: number; recall: number }> {
   if (!canvasHasInk(canvas)) {
-    return { ok: false, score: 0 };
+    return { ok: false, score: 0, recall: 0 };
   }
 
   const userData = rasterizeCanvas(canvas);
@@ -184,9 +196,16 @@ export async function matchFreehandKanji(
 
   const userMask = dilate(normalizeMask(binarize(userData)), 3);
   const refMask = normalizeMask(binarize(refData));
-  const score = matchScore(userMask, refMask);
+  const { score, recall, userInk, refInk } = matchScore(userMask, refMask);
+  const inkRatio = refInk === 0 ? 0 : userInk / refInk;
+  const baseOk = score >= MATCH_THRESHOLD;
+  const autoOk = baseOk && recall >= AUTO_RECALL_MIN && inkRatio >= AUTO_INK_RATIO_MIN;
 
-  return { ok: score >= MATCH_THRESHOLD, score };
+  return {
+    ok: options?.auto ? autoOk : baseOk,
+    score,
+    recall,
+  };
 }
 
 export function clearReferenceCache() {
