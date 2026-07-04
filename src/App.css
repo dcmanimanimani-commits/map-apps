@@ -1556,6 +1556,35 @@ html.boss-no-select button {
   -webkit-tap-highlight-color: transparent;
 }
 
+.boss-pad-stack {
+  position: relative;
+}
+
+.boss-pad-layer {
+  position: relative;
+}
+
+.boss-pad-layer--hidden {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.boss-pad-mode-hint {
+  position: absolute;
+  bottom: 0.35rem;
+  right: 0.5rem;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6366f1;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.15rem 0.45rem;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
 .scribble-kanji-wrap {
   position: relative;
   display: block;
