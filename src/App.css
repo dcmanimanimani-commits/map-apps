@@ -1556,6 +1556,42 @@ html.boss-no-select button {
   -webkit-tap-highlight-color: transparent;
 }
 
+.scribble-kanji-input {
+  display: block;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  background: #ffffff;
+  border: 3px solid #6366f1;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', serif;
+  font-size: clamp(4.5rem, 20vw, 6.5rem);
+  font-weight: 700;
+  color: #1e3a5f;
+  text-align: center;
+  caret-color: #6366f1;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+html.boss-no-select .scribble-kanji-input {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+.scribble-kanji-input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+.scribble-kanji-input:disabled {
+  opacity: 0.6;
+  background: #f8fafc;
+}
+
 .kanji-morph-display {
   width: var(--pad-size, 240px);
   height: var(--pad-size, 240px);
