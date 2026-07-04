@@ -2,21 +2,7 @@ import type { KanjiCharacterJson } from './kanjiWriterLoader';
 
 const GRID = 64;
 const MATCH_SIZE = 256;
-/** ペンを離してから自動判定まで（画数の多い字向け） */
 export const AUTO_IDLE_MS = 2200;
-
-/** 手動「打とう！」— 全部満たす必要あり */
-const MANUAL_IOU_MIN = 0.17;
-const MANUAL_RECALL_MIN = 0.34;
-const MANUAL_PRECISION_MIN = 0.42;
-const MANUAL_INK_RATIO_MIN = 0.18;
-const MANUAL_INK_RATIO_MAX = 2.2;
-
-/** 自動認識（書き途中防止のため手動より厳しめ） */
-const AUTO_IOU_MIN = 0.2;
-const AUTO_RECALL_MIN = 0.4;
-const AUTO_PRECISION_MIN = 0.45;
-const AUTO_INK_RATIO_MIN = 0.32;
 
 const refCache = new Map<string, ImageData>();
 const charDataCache = new Map<string, KanjiCharacterJson>();
@@ -49,6 +35,7 @@ function binarize(data: ImageData, darkThreshold = 210): Uint8Array {
 }
 
 function dilate(mask: Uint8Array, radius: number): Uint8Array {
+  if (radius <= 0) return mask;
   const out = new Uint8Array(mask.length);
   for (let y = 0; y < GRID; y++) {
     for (let x = 0; x < GRID; x++) {
@@ -113,6 +100,7 @@ interface MatchMetrics {
   iou: number;
   recall: number;
   precision: number;
+  combined: number;
   userInk: number;
   refInk: number;
   inkRatio: number;
@@ -128,34 +116,43 @@ function computeMetrics(userMask: Uint8Array, refMask: Uint8Array): MatchMetrics
     if (userMask[i] && refMask[i]) inter++;
   }
   const union = userInk + refInk - inter;
+  const iou = union === 0 ? 0 : inter / union;
+  const recall = refInk === 0 ? 0 : inter / refInk;
+  const precision = userInk === 0 ? 0 : inter / userInk;
+  const combined = iou * 0.35 + recall * 0.3 + precision * 0.35;
   return {
-    iou: union === 0 ? 0 : inter / union,
-    recall: refInk === 0 ? 0 : inter / refInk,
-    precision: userInk === 0 ? 0 : inter / userInk,
+    iou,
+    recall,
+    precision,
+    combined,
     userInk,
     refInk,
     inkRatio: refInk === 0 ? 0 : userInk / refInk,
   };
 }
 
+/**
+ * 手書き（細い線）と活字（塗り）の差を吸収したうえで判定。
+ * - precision … 別の字を弾く（墨が形から外れすぎ）
+ * - combined / iou / recall … 正解の字を通す（全部ANDにしない）
+ */
 function passesManual(m: MatchMetrics): boolean {
-  if (m.userInk < 18) return false;
-  if (m.inkRatio < MANUAL_INK_RATIO_MIN || m.inkRatio > MANUAL_INK_RATIO_MAX) return false;
-  return (
-    m.iou >= MANUAL_IOU_MIN &&
-    m.recall >= MANUAL_RECALL_MIN &&
-    m.precision >= MANUAL_PRECISION_MIN
-  );
+  if (m.userInk < 14) return false;
+  if (m.inkRatio < 0.08 || m.inkRatio > 2.6) return false;
+  if (m.precision < 0.27) return false;
+
+  const shapeOk =
+    m.combined >= 0.19 ||
+    (m.iou >= 0.1 && m.precision >= 0.32) ||
+    (m.recall >= 0.15 && m.precision >= 0.3);
+
+  return shapeOk;
 }
 
 function passesAuto(m: MatchMetrics): boolean {
-  if (m.userInk < 22) return false;
-  if (m.inkRatio < AUTO_INK_RATIO_MIN || m.inkRatio > MANUAL_INK_RATIO_MAX) return false;
-  return (
-    m.iou >= AUTO_IOU_MIN &&
-    m.recall >= AUTO_RECALL_MIN &&
-    m.precision >= AUTO_PRECISION_MIN
-  );
+  if (m.userInk < 18) return false;
+  if (m.inkRatio < 0.22 || m.inkRatio > 2.4) return false;
+  return m.precision >= 0.34 && m.recall >= 0.22 && m.combined >= 0.24;
 }
 
 function canvasHasInk(canvas: HTMLCanvasElement): boolean {
@@ -228,25 +225,16 @@ export async function matchFreehandKanji(
   const userData = rasterizeCanvas(canvas);
   const refData = await renderReference(expectedChar);
 
-  const userRaw = normalizeMask(binarize(userData));
-  const refMask = normalizeMask(binarize(refData));
-  const userDilated = dilate(userRaw, 2);
+  const userNorm = normalizeMask(binarize(userData));
+  const refNorm = normalizeMask(binarize(refData));
+  // 手書き線を太めに、活字側も少し膨らませて公平に比較
+  const userMask = dilate(userNorm, 3);
+  const refMask = dilate(refNorm, 1);
+  const metrics = computeMetrics(userMask, refMask);
 
-  const shape = computeMetrics(userDilated, refMask);
-  const placement = computeMetrics(userRaw, refMask);
-  const metrics: MatchMetrics = {
-    iou: shape.iou,
-    recall: shape.recall,
-    precision: placement.precision,
-    userInk: placement.userInk,
-    refInk: placement.refInk,
-    inkRatio: placement.inkRatio,
-  };
-
-  const score = metrics.iou * 0.4 + metrics.recall * 0.35 + metrics.precision * 0.25;
   const ok = options?.auto ? passesAuto(metrics) : passesManual(metrics);
 
-  return { ok, score, recall: metrics.recall };
+  return { ok, score: metrics.combined, recall: metrics.recall };
 }
 
 export function clearReferenceCache() {
