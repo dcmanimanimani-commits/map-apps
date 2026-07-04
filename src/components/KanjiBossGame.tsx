@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import HanziWriter from 'hanzi-writer';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { getWriteKanjiChars } from '../data/prefectures';
 import { pickBossQuestions, type KanjiBossQuestion } from '../data/kanjiBossQuestions';
-import { createKanjiCharDataLoader } from '../utils/kanjiWriterLoader';
+import { matchFreehandKanji } from '../utils/kanjiMatch';
+import { FreehandKanjiPad, type FreehandKanjiPadHandle } from './FreehandKanjiPad';
 import { FeedbackBanner } from './FeedbackBanner';
 
 interface KanjiBossGameProps {
@@ -18,34 +18,11 @@ const DEFLECT_DAMAGE_PLAYER = 1;
 const MAX_MISTAKES = 4;
 const QUESTION_COUNT = 8;
 
-function useWriterSize() {
-  const [width, setWidth] = useState(() => window.innerWidth);
-  useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+function usePadSize() {
+  return useMemo(() => {
+    const w = window.innerWidth;
+    return Math.min(280, Math.max(200, w * 0.42));
   }, []);
-  return Math.min(240, Math.max(180, width * 0.38));
-}
-
-function writerOptions(size: number) {
-  return {
-    width: size,
-    height: size,
-    padding: Math.round(size * 0.05),
-    showOutline: true,
-    strokeColor: '#1e3a5f',
-    outlineColor: '#cbd5e1',
-    drawingColor: '#6366f1',
-    drawingWidth: Math.max(18, Math.round(size * 0.12)),
-    highlightColor: '#fbbf24',
-    leniency: 2,
-    averageDistanceThreshold: 520,
-    showHintAfterMisses: 2 as const,
-    markStrokeCorrectAfterMisses: 4 as const,
-    acceptBackwardsStrokes: true,
-    charDataLoader: createKanjiCharDataLoader(),
-  };
 }
 
 export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
@@ -59,21 +36,24 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const [attackFx, setAttackFx] = useState<AttackFx>(null);
   const [bossShake, setBossShake] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [padResetKey, setPadResetKey] = useState(0);
+  const [morphChar, setMorphChar] = useState<string | null>(null);
+  const [bulletChar, setBulletChar] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' | null }>({
-    message: 'クイズに答えて、漢字（かんじ）で攻（せ）めよう！',
+    message: 'クイズに答えて、白い紙に漢字（かんじ）を書（か）こう！',
     type: 'info',
   });
-  const [locked, setLocked] = useState(false);
+
+  const padRef = useRef<FreehandKanjiPadHandle>(null);
+  const padSize = usePadSize();
 
   const question = questions[qIndex];
   const chars = useMemo(
     () => (question ? getWriteKanjiChars(question.answerKanji) : []),
     [question?.answerKanji],
   );
-  const currentChar = chars[charIndex];
-  const singleSize = useWriterSize();
-  const singleRef = useRef<HTMLDivElement>(null);
-  const writerRef = useRef<HanziWriter | null>(null);
+  const expectedChar = chars[charIndex];
 
   const startGame = () => {
     setQuestions(pickBossQuestions(QUESTION_COUNT));
@@ -83,36 +63,44 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     setPlayerHp(3);
     setMistakes(0);
     setShowHint(false);
+    setPadResetKey((k) => k + 1);
+    setMorphChar(null);
     setPhase('play');
-    setFeedback({ message: '県（けん）名を漢字（かんじ）で書（か）いてボスをたたく！', type: 'info' });
+    setFeedback({
+      message: '問題（もんだい）を読（よ）んで、県名（けんめい）を1文字ずつ書（か）いて打（う）とう！',
+      type: 'info',
+    });
   };
 
-  const triggerDeflect = useCallback(() => {
+  const triggerDeflect = useCallback((char: string) => {
+    setBulletChar(char || '?');
     setAttackFx('deflect');
     setBossShake(false);
-    setFeedback({ message: '💨 はじかれた！もう一度書（か）いて！', type: 'error' });
+    setFeedback({ message: '💨 はじかれた！もう一度（いちど）書（か）いて！', type: 'error' });
     setTimeout(() => setAttackFx(null), 700);
   }, []);
 
-  const triggerHit = useCallback((final: boolean) => {
+  const triggerHit = useCallback((char: string, final: boolean) => {
+    setBulletChar(char);
     setAttackFx('hit');
     setBossShake(true);
     if (final) {
-      setBossHp((hp) => Math.max(0, hp - HIT_DAMAGE));
       setFeedback({ message: `💥 命中（めいちゅう）！「${question?.answerKanji}」`, type: 'success' });
     } else {
-      setFeedback({ message: '✨ いい感（かん）じ！つぎの文字（もじ）！', type: 'success' });
+      setFeedback({ message: '✨ 活字（かつじ）になった！つぎの文字（もじ）！', type: 'success' });
     }
     setTimeout(() => {
       setAttackFx(null);
       setBossShake(false);
-    }, final ? 900 : 500);
+      setMorphChar(null);
+    }, final ? 900 : 600);
   }, [question?.answerKanji]);
 
   const goNextQuestion = useCallback(() => {
     setMistakes(0);
     setShowHint(false);
     setCharIndex(0);
+    setPadResetKey((k) => k + 1);
     if (qIndex + 1 >= questions.length) {
       setPhase('win');
       return;
@@ -141,68 +129,67 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     });
   }, [question, goNextQuestion]);
 
-  const handleCharComplete = useCallback(() => {
-    if (locked) return;
-    const isLast = charIndex + 1 >= chars.length;
-    triggerHit(isLast);
-    if (!isLast) {
-      setTimeout(() => setCharIndex((i) => i + 1), 500);
+  const handleFire = useCallback(async () => {
+    if (locked || !expectedChar) return;
+    const canvas = padRef.current?.getCanvas();
+    if (!canvas || !padRef.current?.hasInk()) {
+      setFeedback({ message: '✏️ 白い紙に文字（もじ）を書（か）いてから「打（う）とう！」', type: 'info' });
       return;
     }
+
     setLocked(true);
-    setTimeout(() => {
-      setBossHp((hp) => {
-        const next = Math.max(0, hp - HIT_DAMAGE);
-        if (next <= 0) {
-          setPhase('win');
-        } else {
-          goNextQuestion();
-        }
-        return next;
-      });
+    const { ok } = await matchFreehandKanji(canvas, expectedChar);
+
+    if (!ok) {
+      const next = mistakes + 1;
+      setMistakes(next);
+      triggerDeflect('？');
+      padRef.current?.clear();
       setLocked(false);
-    }, 1000);
-  }, [locked, charIndex, chars.length, triggerHit, goNextQuestion]);
-
-  const handleMistake = useCallback(() => {
-    if (locked) return;
-    const next = mistakes + 1;
-    setMistakes(next);
-    triggerDeflect();
-    if (next >= MAX_MISTAKES) {
-      failQuestion();
+      if (next >= MAX_MISTAKES) {
+        failQuestion();
+      }
+      return;
     }
-  }, [locked, mistakes, triggerDeflect, failQuestion]);
 
-  const initWriter = useCallback((char: string) => {
-    if (!singleRef.current) return;
-    singleRef.current.innerHTML = '';
-    const options = writerOptions(singleSize);
-    writerRef.current = HanziWriter.create(singleRef.current, char, options);
-    writerRef.current.quiz({
-      showHintAfterMisses: options.showHintAfterMisses,
-      highlightOnComplete: true,
-      leniency: options.leniency,
-      averageDistanceThreshold: options.averageDistanceThreshold,
-      markStrokeCorrectAfterMisses: options.markStrokeCorrectAfterMisses,
-      acceptBackwardsStrokes: options.acceptBackwardsStrokes,
-      onComplete: handleCharComplete,
-      onMistake: handleMistake,
-    } as Parameters<typeof writerRef.current.quiz>[0]);
-  }, [singleSize, handleMistake, handleCharComplete]);
+    setMorphChar(expectedChar);
+    const isLast = charIndex + 1 >= chars.length;
 
-  useEffect(() => {
-    if (phase !== 'play' || !currentChar || locked) return;
-    initWriter(currentChar);
-  }, [phase, qIndex, charIndex, currentChar, locked, initWriter]);
+    setTimeout(() => {
+      triggerHit(expectedChar, isLast);
+      padRef.current?.clear();
+      setPadResetKey((k) => k + 1);
 
-  const showStrokeOrder = () => {
-    if (!singleRef.current || !currentChar) return;
-    singleRef.current.innerHTML = '';
-    const writer = HanziWriter.create(singleRef.current, currentChar, writerOptions(singleSize));
-    writer.animateCharacter();
-    setTimeout(() => initWriter(currentChar), 2800);
-  };
+      if (!isLast) {
+        setCharIndex((i) => i + 1);
+        setLocked(false);
+        return;
+      }
+
+      setTimeout(() => {
+        setBossHp((hp) => {
+          const next = Math.max(0, hp - HIT_DAMAGE);
+          if (next <= 0) {
+            setPhase('win');
+          } else {
+            goNextQuestion();
+          }
+          return next;
+        });
+        setLocked(false);
+      }, 900);
+    }, 450);
+  }, [
+    locked,
+    expectedChar,
+    mistakes,
+    charIndex,
+    chars.length,
+    triggerDeflect,
+    triggerHit,
+    failQuestion,
+    goNextQuestion,
+  ]);
 
   if (phase === 'intro') {
     return (
@@ -215,10 +202,11 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           <span className="boss-intro-emoji">👹🗾</span>
           <h3>もんだい大王（だいおう）が現（あらわ）れた！</h3>
           <p>名物（めいぶつ）のクイズに答（こた）えて、</p>
-          <p>漢字（かんじ）を書（か）いて弾（たま）にして攻（せ）めよう！</p>
+          <p>白（しろ）い紙（かみ）に漢字（かんじ）を書（か）いて攻（せ）めよう！</p>
           <ul className="boss-intro-rules">
-            <li>✅ 正（ただ）しく書（か）く → ボスに命中（めいちゅう）</li>
-            <li>❌ 間違（まちが）える → はじかれる</li>
+            <li>📝 なぞらない！フリーハンドで書（か）く</li>
+            <li>✨ 書（か）いた文字（もじ）が活字（かつじ）になって弾（たま）になる</li>
+            <li>❌ ちがう → はじかれる</li>
             <li>❤️×3　ボスHPを0にしたら勝（か）ち！</li>
           </ul>
           <button className="btn-primary" onClick={startGame}>たたかう！</button>
@@ -259,7 +247,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     );
   }
 
-  if (!question || !currentChar) return null;
+  if (!question || !expectedChar) return null;
 
   return (
     <div className="game-screen kanji-write-screen boss-screen">
@@ -276,7 +264,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
             </span>
             {attackFx && (
               <span className={`boss-bullet boss-bullet--${attackFx}`} aria-hidden>
-                {currentChar}
+                {bulletChar}
               </span>
             )}
           </div>
@@ -304,41 +292,53 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       </div>
 
       <div className="question-card compact">
-        <p className="question-label">答（こた）えを書（か）こう！「{currentChar}」</p>
-        <div className="kanji-step-strip">
-          {chars.map((char, i) => (
-            <span
-              key={`${char}-${i}`}
-              className={[
-                'kanji-step-char',
-                charIndex === i ? 'active' : '',
-                charIndex > i ? 'done' : '',
-              ].filter(Boolean).join(' ')}
-            >
-              {char}
-            </span>
+        <p className="question-label">答（こた）えを漢字（かんじ）で書（か）こう！（{chars.length}文字（もじ））</p>
+        <div className="boss-char-dots" aria-label={`${charIndex}文字書いた`}>
+          {chars.map((_, i) => (
+            <span key={i} className={`boss-char-dot ${i < charIndex ? 'done' : i === charIndex ? 'active' : ''}`} />
           ))}
         </div>
-        <p className="char-progress">{charIndex + 1} / {chars.length} 文字（もじ）</p>
+        <p className="char-progress">{charIndex + 1}文字目（もじめ）を書（か）いて「打（う）とう！」</p>
       </div>
 
       <FeedbackBanner message={feedback.message} type={feedback.type} />
 
       <div className="hanzi-area boss-hanzi-area">
-        <div
-          ref={singleRef}
-          className="hanzi-canvas hanzi-canvas-lg boss-canvas"
-          style={{ width: singleSize, height: singleSize }}
-        />
-        <p className="hanzi-hint">書（か）いた文字（もじ）が弾（たま）になる！</p>
+        <div className="freehand-pad-wrap">
+          {!morphChar && (
+            <FreehandKanjiPad
+              ref={padRef}
+              size={padSize}
+              disabled={locked}
+              resetKey={padResetKey}
+            />
+          )}
+          {morphChar && (
+            <div className="kanji-morph-display" aria-live="polite">
+              {morphChar}
+            </div>
+          )}
+        </div>
+        <p className="hanzi-hint">Apple Pencil や指（ゆび）で白い紙（かみ）に書（か）いてね</p>
       </div>
 
       <div className="hanzi-actions">
-        <button className="btn-secondary" type="button" onClick={() => setShowHint(true)}>
-          💡 ヒント
+        <button className="btn-primary boss-fire-btn" type="button" onClick={handleFire} disabled={locked}>
+          🎯 打（う）とう！
         </button>
-        <button className="btn-secondary" type="button" onClick={showStrokeOrder}>
-          📝 書き順（かきじゅん）
+        <button
+          className="btn-secondary"
+          type="button"
+          onClick={() => {
+            padRef.current?.clear();
+            setFeedback({ message: '消（け）したよ。もう一度（いちど）書（か）いて！', type: 'info' });
+          }}
+          disabled={locked}
+        >
+          🧹 消（け）す
+        </button>
+        <button className="btn-secondary" type="button" onClick={() => setShowHint(true)} disabled={locked}>
+          💡 ヒント
         </button>
       </div>
     </div>
