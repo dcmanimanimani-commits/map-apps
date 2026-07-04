@@ -398,52 +398,54 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
 
       <FeedbackBanner message={feedback.message} type={feedback.type} />
 
-      <div className={`hanzi-actions ${useScribble ? 'hanzi-actions--above-pad' : ''}`}>
-        <button className="btn-primary boss-fire-btn" type="button" onClick={() => handleFire()} disabled={locked || !!morphChar}>
-          🎯 打（う）とう！
-        </button>
-        <button
-          className="btn-secondary"
-          type="button"
-          onClick={() => {
-            padRef.current?.clear();
-            setFeedback({ message: '消（け）したよ。もう一度（いちど）書（か）いて！', type: 'info' });
-          }}
-          disabled={locked || !!morphChar}
-        >
-          🧹 消（け）す
-        </button>
-        <button className="btn-secondary" type="button" onClick={() => setShowHint(true)} disabled={locked}>
-          💡 ヒント
-        </button>
-      </div>
-
-      <div className="hanzi-area boss-hanzi-area">
-        <div className="freehand-pad-wrap" style={{ width: padSize, height: padSize }}>
-          {morphChar ? (
-            <div className="kanji-morph-stage" style={{ width: padSize, height: padSize }}>
-              {morphSnapshot && (
-                <img src={morphSnapshot} alt="" className="kanji-morph-hand" />
-              )}
-              <KanjiGlyph char={morphChar} size={padSize} className="kanji-morph-glyph" />
-            </div>
-          ) : (
-            <HybridKanjiPad
-              ref={padRef}
-              size={padSize}
-              disabled={locked}
-              resetKey={padResetKey}
-              scribbleEnabled={useScribble}
-            />
-          )}
+      <div className="boss-write-row">
+        <div className="hanzi-area boss-hanzi-area">
+          <div className="freehand-pad-wrap" style={{ width: padSize, height: padSize }}>
+            {morphChar ? (
+              <div className="kanji-morph-stage" style={{ width: padSize, height: padSize }}>
+                {morphSnapshot && (
+                  <img src={morphSnapshot} alt="" className="kanji-morph-hand" />
+                )}
+                <KanjiGlyph char={morphChar} size={padSize} className="kanji-morph-glyph" />
+              </div>
+            ) : (
+              <HybridKanjiPad
+                ref={padRef}
+                size={padSize}
+                disabled={locked}
+                resetKey={padResetKey}
+                scribbleEnabled={useScribble}
+              />
+            )}
+          </div>
+          <p className="hanzi-hint">
+            {morphChar
+              ? '活字（かつじ）になった！'
+              : useScribble
+                ? 'Pencil＝活字　指＝フリーハンド'
+                : '書（か）き終（お）わったら「打（う）とう！」'}
+          </p>
         </div>
-        <p className="hanzi-hint">
-          {morphChar
-            ? '活字（かつじ）になった！'
-            : useScribble
-              ? 'Pencil＝活字　指＝フリーハンド →「打とう！」'
-              : '書（か）き終（お）わったら「打（う）とう！」'}
-        </p>
+
+        <div className="hanzi-actions boss-write-actions">
+          <button className="btn-primary boss-fire-btn" type="button" onClick={() => handleFire()} disabled={locked || !!morphChar}>
+            🎯 打（う）とう！
+          </button>
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={() => {
+              padRef.current?.clear();
+              setFeedback({ message: '消（け）したよ。もう一度（いちど）書（か）いて！', type: 'info' });
+            }}
+            disabled={locked || !!morphChar}
+          >
+            🧹 消（け）す
+          </button>
+          <button className="btn-secondary" type="button" onClick={() => setShowHint(true)} disabled={locked}>
+            💡 ヒント
+          </button>
+        </div>
       </div>
       </div>
     </div>
