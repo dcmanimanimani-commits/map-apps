@@ -28,13 +28,21 @@ const MORPH_MS = 900;
 function usePadSize() {
   return useMemo(() => {
     const w = window.innerWidth;
-    const sideCol = 112;
-    const avatarCol = 88;
-    const gap = 8;
-    const edgePad = 16;
-    const maxPad = w - sideCol - avatarCol - gap * 2 - edgePad;
-    return Math.floor(Math.min(292, Math.max(200, Math.min(w * 0.46, maxPad))));
+    const sideCol = 108;
+    const gap = 12;
+    const edgePad = 12;
+    const maxPad = w - sideCol * 2 - gap * 2 - edgePad;
+    return Math.floor(Math.min(280, Math.max(200, Math.min(w * 0.42, maxPad))));
   }, []);
+}
+
+function useCheerSize(padSize: number) {
+  return useMemo(() => {
+    const w = window.innerWidth;
+    const sideCol = 108;
+    const leftSpace = (w - padSize - sideCol - 24) / 2;
+    return Math.floor(Math.min(320, Math.max(200, leftSpace * 0.92)));
+  }, [padSize]);
 }
 
 export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
@@ -66,6 +74,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const padRef = useRef<HybridKanjiPadHandle>(null);
   const firingRef = useRef(false);
   const padSize = usePadSize();
+  const cheerSize = useCheerSize(padSize);
 
   const question = questions[qIndex];
   const chars = useMemo(
@@ -417,7 +426,10 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
 
       <div
         className="boss-write-row"
-        style={{ '--boss-pad-size': `${padSize}px` } as React.CSSProperties}
+        style={{
+          '--boss-pad-size': `${padSize}px`,
+          '--boss-cheer-size': `${cheerSize}px`,
+        } as React.CSSProperties}
       >
         <div className={`boss-cheer-slot ${cheerClass}`}>
           <PlayerAvatar level={avatarLevel} size="cheer" className="boss-cheer-avatar" />

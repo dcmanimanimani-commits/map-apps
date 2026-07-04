@@ -20,7 +20,7 @@ function sizePx(size: 'sm' | 'md' | 'lg' | 'xl' | 'picker' | 'cheer'): number {
   if (size === 'xl') return 168;
   if (size === 'lg') return 136;
   if (size === 'picker') return 88;
-  if (size === 'cheer') return 80;
+  if (size === 'cheer') return 320;
   if (size === 'sm') return 72;
   return 104;
 }
