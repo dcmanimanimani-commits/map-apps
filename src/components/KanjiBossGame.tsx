@@ -240,16 +240,16 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
 
   if (phase === 'intro') {
     return (
-      <div className="game-screen kanji-write-screen boss-screen">
+      <div className="game-screen kanji-write-screen boss-screen boss-screen--intro">
         <header className="game-header compact">
           <button className="btn-back" onClick={onBack}>← もどる</button>
-          <h2>👹 漢字ボスたたき</h2>
+          <h2>👹 ボス戦</h2>
         </header>
+        <div className="boss-intro-stage">
+          <img src={BOSS_IMAGE} alt="" className="boss-intro-img" width={320} height={320} />
+          <p className="boss-intro-name">もんだい大王（だいおう）</p>
+        </div>
         <div className="boss-intro-card">
-          <div className="boss-intro-hero">
-            <img src={BOSS_IMAGE} alt="" className="boss-intro-img" width={120} height={120} />
-            <span className="boss-intro-map" aria-hidden>🗾</span>
-          </div>
           <h3>もんだい大王（だいおう）が現（あらわ）れた！</h3>
           <p>名物（めいぶつ）のクイズに答（こた）えて、</p>
           <p>白（しろ）い紙（かみ）に漢字（かんじ）を書（か）いて攻（せ）めよう！</p>
@@ -307,42 +307,48 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   if (!question || !expectedChar) return null;
 
   return (
-    <div className="game-screen kanji-write-screen boss-screen">
-      <header className="game-header compact">
+    <div className="game-screen kanji-write-screen boss-screen boss-screen--play">
+      <header className="game-header compact boss-play-header">
         <button className="btn-back" onClick={onBack}>← もどる</button>
-        <h2>👹 漢字ボスたたき</h2>
+        <h2>👹 ボス戦</h2>
+        <span className="boss-play-qno">Q{qIndex + 1}/{questions.length}</span>
       </header>
 
-      <div className="boss-arena">
-        <div className="boss-status">
-          <div className="boss-face-wrap">
-            <img
-              src={BOSS_IMAGE}
-              alt=""
-              className={`boss-face-img ${bossShake ? 'boss-face--hit' : ''} ${attackFx === 'deflect' ? 'boss-face--block' : ''}`}
-              width={80}
-              height={80}
-            />
-            {attackFx && (
-              <span className={`boss-bullet boss-bullet--${attackFx}`} aria-hidden>
-                {bulletChar}
-              </span>
-            )}
-          </div>
-          <div className="boss-hp-bar">
-            <div className="boss-hp-fill" style={{ width: `${(bossHp / BOSS_MAX_HP) * 100}%` }} />
-          </div>
-          <p className="boss-hp-label">ボス HP {bossHp}</p>
-        </div>
-        <div className="player-hearts" aria-label={`体力 ${playerHp}`}>
+      <div className="boss-stage">
+        <div className="boss-stage-hearts" aria-label={`体力 ${playerHp}`}>
           {Array.from({ length: 3 }, (_, i) => (
             <span key={i} className={i < playerHp ? 'heart on' : 'heart off'}>❤️</span>
           ))}
         </div>
+
+        <div className="boss-face-wrap">
+          <img
+            src={BOSS_IMAGE}
+            alt=""
+            className={`boss-face-img ${bossShake ? 'boss-face--hit' : ''} ${attackFx === 'deflect' ? 'boss-face--block' : ''}`}
+            width={320}
+            height={320}
+          />
+          {attackFx && (
+            <span className={`boss-bullet boss-bullet--${attackFx}`} aria-hidden>
+              {bulletChar}
+            </span>
+          )}
+        </div>
+
+        <div className="boss-stage-hud">
+          <div className="boss-hp-row">
+            <span className="boss-hp-label">もんだい大王 HP</span>
+            <span className="boss-hp-value">{bossHp}</span>
+          </div>
+          <div className="boss-hp-bar">
+            <div className="boss-hp-fill" style={{ width: `${(bossHp / BOSS_MAX_HP) * 100}%` }} />
+          </div>
+        </div>
       </div>
 
+      <div className="boss-battle-panel">
       <div className="boss-quiz-card">
-        <p className="boss-quiz-label">問題（もんだい） {qIndex + 1} / {questions.length}</p>
         <p className="boss-quiz-text">
           <span className="boss-quiz-emoji">{question.emoji}</span>
           {question.question}
@@ -438,6 +444,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
               ? 'Pencil＝活字　指＝フリーハンド →「打とう！」'
               : '書（か）き終（お）わったら「打（う）とう！」'}
         </p>
+      </div>
       </div>
     </div>
   );

@@ -190,7 +190,7 @@ export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
             onClick={() => setPhase('boss')}
           >
             <span className="kanji-mode-emoji">👹</span>
-            <span className="kanji-mode-title">ボスたたき</span>
+            <span className="kanji-mode-title">ボス戦</span>
             <span className="kanji-mode-desc">クイズに漢字で答えて攻撃！</span>
           </button>
         </div>
