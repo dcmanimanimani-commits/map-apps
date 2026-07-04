@@ -1556,9 +1556,16 @@ html.boss-no-select button {
   -webkit-tap-highlight-color: transparent;
 }
 
+.scribble-kanji-wrap {
+  position: relative;
+  display: block;
+}
+
 .scribble-kanji-input {
   display: block;
   box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   padding: 0;
   margin: 0;
   background: #ffffff;
@@ -1570,10 +1577,22 @@ html.boss-no-select button {
   font-weight: 700;
   color: #1e3a5f;
   text-align: center;
-  caret-color: #6366f1;
+  caret-color: transparent;
   -webkit-user-select: text;
   user-select: text;
-  -webkit-touch-callout: default;
+  -webkit-touch-callout: none;
+}
+
+.scribble-kanji-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  font-weight: 600;
+  pointer-events: none;
 }
 
 html.boss-no-select .scribble-kanji-input {
@@ -1590,6 +1609,16 @@ html.boss-no-select .scribble-kanji-input {
 .scribble-kanji-input:disabled {
   opacity: 0.6;
   background: #f8fafc;
+}
+
+.hanzi-actions--above-pad {
+  margin-bottom: 0.65rem;
+  position: relative;
+  z-index: 2;
+}
+
+.boss-screen:has(.hanzi-actions--above-pad) {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
 .kanji-morph-display {

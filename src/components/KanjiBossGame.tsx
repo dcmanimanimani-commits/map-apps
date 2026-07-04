@@ -233,6 +233,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       setMistakes(next);
       triggerDeflect(useScribble ? (writtenChar || '？') : '？');
       clearPad();
+      if (useScribble) scribbleRef.current?.blur();
       setLocked(false);
       firingRef.current = false;
       if (next >= MAX_MISTAKES) {
@@ -409,12 +410,32 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           {morphChar
             ? '✨ 活字（かつじ）に変（か）わってる…'
             : useScribble
-              ? '白（しろ）い紙（かみ）に Apple Pencil で1文字（もじ）書（か）こう！'
+              ? '白い紙をタップ → 書く → 活字になったら「打とう！」'
               : '白（しろ）い紙（かみ）に今（いま）の1文字（もじ）だけ書（か）いて！'}
         </p>
       </div>
 
       <FeedbackBanner message={feedback.message} type={feedback.type} />
+
+      <div className={`hanzi-actions ${useScribble ? 'hanzi-actions--above-pad' : ''}`}>
+        <button className="btn-primary boss-fire-btn" type="button" onClick={() => handleFire()} disabled={locked || !!morphChar}>
+          🎯 打（う）とう！
+        </button>
+        <button
+          className="btn-secondary"
+          type="button"
+          onClick={() => {
+            clearPad();
+            setFeedback({ message: '消（け）したよ。もう一度（いちど）書（か）いて！', type: 'info' });
+          }}
+          disabled={locked || !!morphChar}
+        >
+          🧹 消（け）す
+        </button>
+        <button className="btn-secondary" type="button" onClick={() => setShowHint(true)} disabled={locked}>
+          💡 ヒント
+        </button>
+      </div>
 
       <div className="hanzi-area boss-hanzi-area">
         <div className="freehand-pad-wrap" style={{ width: padSize, height: padSize }}>
@@ -445,29 +466,9 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           {morphChar
             ? '活字（かつじ）になった！'
             : useScribble
-              ? 'キーノートと同じ！ Pencil で書（か）くと活字（かつじ）になる →「打（う）とう！」'
+              ? '書き終わるとメニューが消える →「打とう！」を押してね'
               : '書（か）き終（お）わったら「打（う）とう！」'}
         </p>
-      </div>
-
-      <div className="hanzi-actions">
-        <button className="btn-primary boss-fire-btn" type="button" onClick={() => handleFire()} disabled={locked || !!morphChar}>
-          🎯 打（う）とう！
-        </button>
-        <button
-          className="btn-secondary"
-          type="button"
-          onClick={() => {
-            clearPad();
-            setFeedback({ message: '消（け）したよ。もう一度（いちど）書（か）いて！', type: 'info' });
-          }}
-          disabled={locked || !!morphChar}
-        >
-          🧹 消（け）す
-        </button>
-        <button className="btn-secondary" type="button" onClick={() => setShowHint(true)} disabled={locked}>
-          💡 ヒント
-        </button>
       </div>
     </div>
   );
