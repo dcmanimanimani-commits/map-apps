@@ -3,6 +3,7 @@ import { getWriteKanjiChars } from '../data/prefectures';
 import { pickBossQuestions, type KanjiBossQuestion } from '../data/kanjiBossQuestions';
 import { matchFreehandKanji } from '../utils/kanjiMatch';
 import { FreehandKanjiPad, type FreehandKanjiPadHandle } from './FreehandKanjiPad';
+import { KanjiGlyph } from './KanjiGlyph';
 import { FeedbackBanner } from './FeedbackBanner';
 
 interface KanjiBossGameProps {
@@ -17,11 +18,12 @@ const HIT_DAMAGE = 25;
 const DEFLECT_DAMAGE_PLAYER = 1;
 const MAX_MISTAKES = 4;
 const QUESTION_COUNT = 8;
+const MORPH_MS = 900;
 
 function usePadSize() {
   return useMemo(() => {
     const w = window.innerWidth;
-    return Math.min(280, Math.max(200, w * 0.42));
+    return Math.min(300, Math.max(220, w * 0.55));
   }, []);
 }
 
@@ -30,6 +32,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const [questions, setQuestions] = useState<KanjiBossQuestion[]>([]);
   const [qIndex, setQIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
+  const [completedChars, setCompletedChars] = useState<string[]>([]);
   const [bossHp, setBossHp] = useState(BOSS_MAX_HP);
   const [playerHp, setPlayerHp] = useState(3);
   const [mistakes, setMistakes] = useState(0);
@@ -39,6 +42,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const [locked, setLocked] = useState(false);
   const [padResetKey, setPadResetKey] = useState(0);
   const [morphChar, setMorphChar] = useState<string | null>(null);
+  const [morphSnapshot, setMorphSnapshot] = useState<string | null>(null);
   const [bulletChar, setBulletChar] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' | null }>({
     message: 'クイズに答えて、白い紙に漢字（かんじ）を書（か）こう！',
@@ -46,6 +50,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   });
 
   const padRef = useRef<FreehandKanjiPadHandle>(null);
+  const firingRef = useRef(false);
   const padSize = usePadSize();
 
   const question = questions[qIndex];
@@ -59,15 +64,17 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     setQuestions(pickBossQuestions(QUESTION_COUNT));
     setQIndex(0);
     setCharIndex(0);
+    setCompletedChars([]);
     setBossHp(BOSS_MAX_HP);
     setPlayerHp(3);
     setMistakes(0);
     setShowHint(false);
     setPadResetKey((k) => k + 1);
     setMorphChar(null);
+    setMorphSnapshot(null);
     setPhase('play');
     setFeedback({
-      message: '問題（もんだい）を読（よ）んで、県名（けんめい）を1文字ずつ書（か）いて打（う）とう！',
+      message: '1文字（もじ）ずつ書（か）く！ 書（か）き終（お）わると活字（かつじ）になるよ',
       type: 'info',
     });
   };
@@ -87,12 +94,11 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     if (final) {
       setFeedback({ message: `💥 命中（めいちゅう）！「${question?.answerKanji}」`, type: 'success' });
     } else {
-      setFeedback({ message: '✨ 活字（かつじ）になった！つぎの文字（もじ）！', type: 'success' });
+      setFeedback({ message: '✨ 活字（かつじ）になった！つぎの1文字（もじ）！', type: 'success' });
     }
     setTimeout(() => {
       setAttackFx(null);
       setBossShake(false);
-      setMorphChar(null);
     }, final ? 900 : 600);
   }, [question?.answerKanji]);
 
@@ -100,13 +106,16 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     setMistakes(0);
     setShowHint(false);
     setCharIndex(0);
+    setCompletedChars([]);
+    setMorphChar(null);
+    setMorphSnapshot(null);
     setPadResetKey((k) => k + 1);
     if (qIndex + 1 >= questions.length) {
       setPhase('win');
       return;
     }
     setQIndex((i) => i + 1);
-    setFeedback({ message: 'つぎの問題（もんだい）！', type: 'info' });
+    setFeedback({ message: 'つぎの問題（もんだい）！ また1文字（もじ）ずつ！', type: 'info' });
   }, [qIndex, questions.length]);
 
   const failQuestion = useCallback(() => {
@@ -130,14 +139,14 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   }, [question, goNextQuestion]);
 
   const handleFire = useCallback(async () => {
-    if (locked || !expectedChar) return;
+    if (locked || firingRef.current || !expectedChar || morphChar) return;
     const canvas = padRef.current?.getCanvas();
-    if (!canvas || !padRef.current?.hasInk()) {
-      setFeedback({ message: '✏️ 白い紙に文字（もじ）を書（か）いてから「打（う）とう！」', type: 'info' });
-      return;
-    }
+    if (!canvas || !padRef.current?.hasInk()) return;
 
+    firingRef.current = true;
     setLocked(true);
+
+    const snapshot = padRef.current.toDataURL();
     const { ok } = await matchFreehandKanji(canvas, expectedChar);
 
     if (!ok) {
@@ -146,42 +155,53 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       triggerDeflect('？');
       padRef.current?.clear();
       setLocked(false);
+      firingRef.current = false;
       if (next >= MAX_MISTAKES) {
         failQuestion();
       }
       return;
     }
 
+    setMorphSnapshot(snapshot);
     setMorphChar(expectedChar);
     const isLast = charIndex + 1 >= chars.length;
 
     setTimeout(() => {
       triggerHit(expectedChar, isLast);
-      padRef.current?.clear();
-      setPadResetKey((k) => k + 1);
-
-      if (!isLast) {
-        setCharIndex((i) => i + 1);
-        setLocked(false);
-        return;
-      }
+      setCompletedChars((prev) => [...prev, expectedChar]);
 
       setTimeout(() => {
-        setBossHp((hp) => {
-          const next = Math.max(0, hp - HIT_DAMAGE);
-          if (next <= 0) {
-            setPhase('win');
-          } else {
-            goNextQuestion();
-          }
-          return next;
-        });
-        setLocked(false);
-      }, 900);
-    }, 450);
+        setMorphChar(null);
+        setMorphSnapshot(null);
+        padRef.current?.clear();
+        setPadResetKey((k) => k + 1);
+
+        if (!isLast) {
+          setCharIndex((i) => i + 1);
+          setLocked(false);
+          firingRef.current = false;
+          return;
+        }
+
+        setTimeout(() => {
+          setBossHp((hp) => {
+            const next = Math.max(0, hp - HIT_DAMAGE);
+            if (next <= 0) {
+              setPhase('win');
+            } else {
+              goNextQuestion();
+            }
+            return next;
+          });
+          setLocked(false);
+          firingRef.current = false;
+        }, 500);
+      }, isLast ? 400 : 300);
+    }, MORPH_MS);
   }, [
     locked,
     expectedChar,
+    morphChar,
     mistakes,
     charIndex,
     chars.length,
@@ -190,6 +210,12 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     failQuestion,
     goNextQuestion,
   ]);
+
+  const handlePadIdle = useCallback(() => {
+    if (locked || morphChar) return;
+    if (!padRef.current?.hasInk()) return;
+    handleFire();
+  }, [locked, morphChar, handleFire]);
 
   if (phase === 'intro') {
     return (
@@ -204,8 +230,8 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           <p>名物（めいぶつ）のクイズに答（こた）えて、</p>
           <p>白（しろ）い紙（かみ）に漢字（かんじ）を書（か）いて攻（せ）めよう！</p>
           <ul className="boss-intro-rules">
-            <li>📝 なぞらない！フリーハンドで書（か）く</li>
-            <li>✨ 書（か）いた文字（もじ）が活字（かつじ）になって弾（たま）になる</li>
+            <li>📝 <strong>1文字（もじ）ずつ</strong>白い紙（かみ）に書（か）く</li>
+            <li>✨ 書（か）き終（お）わると<strong>活字（かつじ）</strong>になって弾（たま）になる</li>
             <li>❌ ちがう → はじかれる</li>
             <li>❤️×3　ボスHPを0にしたら勝（か）ち！</li>
           </ul>
@@ -291,39 +317,72 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
         )}
       </div>
 
-      <div className="question-card compact">
-        <p className="question-label">答（こた）えを漢字（かんじ）で書（か）こう！（{chars.length}文字（もじ））</p>
-        <div className="boss-char-dots" aria-label={`${charIndex}文字書いた`}>
+      <div className="question-card compact boss-write-card">
+        <p className="boss-step-banner">
+          1文字（もじ）ずつ書（か）く！　今（いま）は <strong>{charIndex + 1}文字目</strong>（全部で{chars.length}文字）
+        </p>
+        <div className="boss-answer-strip" aria-label="答えの進み">
           {chars.map((_, i) => (
-            <span key={i} className={`boss-char-dot ${i < charIndex ? 'done' : i === charIndex ? 'active' : ''}`} />
+            <div
+              key={i}
+              className={[
+                'boss-answer-slot',
+                i < completedChars.length ? 'done' : '',
+                i === charIndex && !morphChar ? 'active' : '',
+                i === charIndex && morphChar ? 'morphing' : '',
+              ].filter(Boolean).join(' ')}
+            >
+              {i < completedChars.length ? (
+                <KanjiGlyph char={completedChars[i]} size={36} />
+              ) : i === charIndex ? (
+                morphChar ? (
+                  <KanjiGlyph char={morphChar} size={36} className="boss-slot-glyph" />
+                ) : (
+                  <span className="boss-slot-now">✏️</span>
+                )
+              ) : (
+                <span className="boss-slot-empty">·</span>
+              )}
+            </div>
           ))}
         </div>
-        <p className="char-progress">{charIndex + 1}文字目（もじめ）を書（か）いて「打（う）とう！」</p>
+        <p className="char-progress">
+          {morphChar
+            ? '✨ 活字（かつじ）に変（か）わってる…'
+            : '白（しろ）い紙（かみ）に今（いま）の1文字（もじ）だけ書（か）いて！'}
+        </p>
       </div>
 
       <FeedbackBanner message={feedback.message} type={feedback.type} />
 
       <div className="hanzi-area boss-hanzi-area">
-        <div className="freehand-pad-wrap">
-          {!morphChar && (
+        <div className="freehand-pad-wrap" style={{ width: padSize, height: padSize }}>
+          {morphChar ? (
+            <div className="kanji-morph-stage" style={{ width: padSize, height: padSize }}>
+              {morphSnapshot && (
+                <img src={morphSnapshot} alt="" className="kanji-morph-hand" />
+              )}
+              <KanjiGlyph char={morphChar} size={padSize} className="kanji-morph-glyph" />
+            </div>
+          ) : (
             <FreehandKanjiPad
               ref={padRef}
               size={padSize}
               disabled={locked}
               resetKey={padResetKey}
+              onIdle={handlePadIdle}
             />
           )}
-          {morphChar && (
-            <div className="kanji-morph-display" aria-live="polite">
-              {morphChar}
-            </div>
-          )}
         </div>
-        <p className="hanzi-hint">Apple Pencil や指（ゆび）で白い紙（かみ）に書（か）いてね</p>
+        <p className="hanzi-hint">
+          {morphChar
+            ? '手書（てが）き → 活字（かつじ）！'
+            : 'ペンや指（ゆび）で書（か）く → 書（か）き終（お）わったら活字（かつじ）になる'}
+        </p>
       </div>
 
       <div className="hanzi-actions">
-        <button className="btn-primary boss-fire-btn" type="button" onClick={handleFire} disabled={locked}>
+        <button className="btn-primary boss-fire-btn" type="button" onClick={handleFire} disabled={locked || !!morphChar}>
           🎯 打（う）とう！
         </button>
         <button
@@ -333,7 +392,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
             padRef.current?.clear();
             setFeedback({ message: '消（け）したよ。もう一度（いちど）書（か）いて！', type: 'info' });
           }}
-          disabled={locked}
+          disabled={locked || !!morphChar}
         >
           🧹 消（け）す
         </button>

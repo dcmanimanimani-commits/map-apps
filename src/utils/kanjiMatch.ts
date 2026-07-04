@@ -1,7 +1,9 @@
 import type { KanjiCharacterJson } from './kanjiWriterLoader';
 
 const GRID = 64;
-const MATCH_THRESHOLD = 0.28;
+const MATCH_SIZE = 256;
+/** 小学生の手書き向けにゆるめ */
+const MATCH_THRESHOLD = 0.14;
 
 const refCache = new Map<string, ImageData>();
 const charDataCache = new Map<string, KanjiCharacterJson>();
@@ -28,6 +30,26 @@ function binarize(data: ImageData, darkThreshold = 210): Uint8Array {
       const i = (sy * width + sx) * 4;
       const lum = (px[i] + px[i + 1] + px[i + 2]) / 3;
       out[gy * GRID + gx] = lum < darkThreshold ? 1 : 0;
+    }
+  }
+  return out;
+}
+
+function dilate(mask: Uint8Array, radius: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      if (!mask[y * GRID + x]) continue;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (dx * dx + dy * dy > radius * radius) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && nx < GRID && ny >= 0 && ny < GRID) {
+            out[ny * GRID + nx] = 1;
+          }
+        }
+      }
     }
   }
   return out;
@@ -74,14 +96,21 @@ function normalizeMask(mask: Uint8Array): Uint8Array {
   return out;
 }
 
-function iou(a: Uint8Array, b: Uint8Array): number {
+function matchScore(userMask: Uint8Array, refMask: Uint8Array): number {
   let inter = 0;
-  let union = 0;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] || b[i]) union++;
-    if (a[i] && b[i]) inter++;
+  let userInk = 0;
+  let refInk = 0;
+  for (let i = 0; i < userMask.length; i++) {
+    if (userMask[i]) userInk++;
+    if (refMask[i]) refInk++;
+    if (userMask[i] && refMask[i]) inter++;
   }
-  return union === 0 ? 0 : inter / union;
+  if (userInk < 12) return 0;
+  const union = userInk + refInk - inter;
+  const iou = union === 0 ? 0 : inter / union;
+  const recall = refInk === 0 ? 0 : inter / refInk;
+  const precision = userInk === 0 ? 0 : inter / userInk;
+  return Math.max(iou, recall * 0.55, precision * 0.35);
 }
 
 function canvasHasInk(canvas: HTMLCanvasElement): boolean {
@@ -96,29 +125,40 @@ function canvasHasInk(canvas: HTMLCanvasElement): boolean {
   return false;
 }
 
-async function renderReference(char: string, size: number): Promise<ImageData> {
-  const key = `${char}:${size}`;
+function rasterizeCanvas(canvas: HTMLCanvasElement): ImageData {
+  const tmp = document.createElement('canvas');
+  tmp.width = MATCH_SIZE;
+  tmp.height = MATCH_SIZE;
+  const ctx = tmp.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, MATCH_SIZE, MATCH_SIZE);
+  ctx.drawImage(canvas, 0, 0, MATCH_SIZE, MATCH_SIZE);
+  return ctx.getImageData(0, 0, MATCH_SIZE, MATCH_SIZE);
+}
+
+async function renderReference(char: string): Promise<ImageData> {
+  const key = char;
   const cached = refCache.get(key);
   if (cached) return cached;
 
   const data = await loadCharData(char);
   const paths = data.strokes.map((stroke) => `<path d="${stroke}" fill="#111827"/>`).join('');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${MATCH_SIZE}" height="${MATCH_SIZE}">
     <g transform="scale(1,-1) translate(0,-900)">${paths}</g>
   </svg>`;
 
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = MATCH_SIZE;
+  canvas.height = MATCH_SIZE;
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
+  ctx.fillRect(0, 0, MATCH_SIZE, MATCH_SIZE);
 
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
   await new Promise<void>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      ctx.drawImage(img, 0, 0, size, size);
+      ctx.drawImage(img, 0, 0, MATCH_SIZE, MATCH_SIZE);
       URL.revokeObjectURL(url);
       resolve();
     };
@@ -126,7 +166,7 @@ async function renderReference(char: string, size: number): Promise<ImageData> {
     img.src = url;
   });
 
-  const imageData = ctx.getImageData(0, 0, size, size);
+  const imageData = ctx.getImageData(0, 0, MATCH_SIZE, MATCH_SIZE);
   refCache.set(key, imageData);
   return imageData;
 }
@@ -139,14 +179,12 @@ export async function matchFreehandKanji(
     return { ok: false, score: 0 };
   }
 
-  const size = canvas.width;
-  const ctx = canvas.getContext('2d')!;
-  const userData = ctx.getImageData(0, 0, size, size);
-  const refData = await renderReference(expectedChar, size);
+  const userData = rasterizeCanvas(canvas);
+  const refData = await renderReference(expectedChar);
 
-  const userMask = normalizeMask(binarize(userData));
+  const userMask = dilate(normalizeMask(binarize(userData)), 3);
   const refMask = normalizeMask(binarize(refData));
-  const score = iou(userMask, refMask);
+  const score = matchScore(userMask, refMask);
 
   return { ok: score >= MATCH_THRESHOLD, score };
 }

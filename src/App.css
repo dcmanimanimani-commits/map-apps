@@ -1554,6 +1554,119 @@
   animation: kanji-morph-in 0.45s ease;
 }
 
+.kanji-morph-stage {
+  position: relative;
+  border: 3px solid #6366f1;
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+}
+
+.kanji-morph-hand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: morph-hand-out 0.85s ease forwards;
+  pointer-events: none;
+}
+
+.kanji-morph-glyph {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  animation: morph-glyph-in 0.85s ease forwards;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes morph-hand-out {
+  0% { opacity: 1; filter: blur(0); transform: scale(1); }
+  100% { opacity: 0; filter: blur(5px); transform: scale(0.9); }
+}
+
+@keyframes morph-glyph-in {
+  0% { opacity: 0; transform: scale(0.75); filter: blur(4px); }
+  40% { opacity: 0.3; }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+.boss-write-card {
+  margin-bottom: 0.25rem;
+}
+
+.boss-step-banner {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e3a5f;
+  text-align: center;
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+
+.boss-step-banner strong {
+  color: #6366f1;
+  font-size: 1.05rem;
+}
+
+.boss-answer-strip {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0.35rem 0;
+}
+
+.boss-answer-slot {
+  width: 44px;
+  height: 44px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+}
+
+.boss-answer-slot.active {
+  border: 3px solid #6366f1;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  animation: slot-pulse 1.2s ease infinite;
+}
+
+.boss-answer-slot.done,
+.boss-answer-slot.morphing {
+  border: 2px solid #22c55e;
+  background: #f0fdf4;
+}
+
+.boss-slot-now {
+  font-size: 1.1rem;
+}
+
+.boss-slot-empty {
+  color: #cbd5e1;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.boss-slot-glyph {
+  animation: slot-glyph-pop 0.4s ease;
+}
+
+@keyframes slot-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+  50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.28); }
+}
+
+@keyframes slot-glyph-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @keyframes kanji-morph-in {
   0% {
     opacity: 0;
