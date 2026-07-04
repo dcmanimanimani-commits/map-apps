@@ -6,10 +6,11 @@ const MATCH_SIZE = 256;
 export const AUTO_IDLE_MS = 2200;
 
 /** 別の字が正解よりこれ以上上回ったら「別の字を書いた」とみなす */
-const WRONG_CHAR_MARGIN = 0.055;
+const WRONG_CHAR_MARGIN = 0.07;
 
 const refImageCache = new Map<string, ImageData>();
 const refMaskCache = new Map<string, Uint8Array>();
+const strokeCountCache = new Map<string, number>();
 const charDataCache = new Map<string, KanjiCharacterJson>();
 
 const GAME_KANJI: string[] = (() => {
@@ -27,7 +28,15 @@ async function loadCharData(char: string): Promise<KanjiCharacterJson> {
   if (!res.ok) throw new Error(`Failed to load ${char}`);
   const data = (await res.json()) as KanjiCharacterJson;
   charDataCache.set(char, data);
+  strokeCountCache.set(char, data.strokes.length);
   return data;
+}
+
+async function getStrokeCount(char: string): Promise<number> {
+  const cached = strokeCountCache.get(char);
+  if (cached !== undefined) return cached;
+  const data = await loadCharData(char);
+  return data.strokes.length;
 }
 
 function binarize(data: ImageData, darkThreshold = 210): Uint8Array {
@@ -132,7 +141,8 @@ function computeMetrics(userMask: Uint8Array, refMask: Uint8Array): MatchMetrics
   const iou = union === 0 ? 0 : inter / union;
   const recall = refInk === 0 ? 0 : inter / refInk;
   const precision = userInk === 0 ? 0 : inter / userInk;
-  const combined = iou * 0.35 + recall * 0.3 + precision * 0.35;
+  // 手書きは recall（形をどれだけカバーしたか）を重視
+  const combined = iou * 0.22 + recall * 0.43 + precision * 0.35;
   return {
     iou,
     recall,
@@ -144,26 +154,39 @@ function computeMetrics(userMask: Uint8Array, refMask: Uint8Array): MatchMetrics
   };
 }
 
-/** 「打とう！」— 小学生の手書き向けにゆるめ */
-function passesManual(m: MatchMetrics): boolean {
-  if (m.userInk < 10) return false;
-  if (m.inkRatio < 0.05 || m.inkRatio > 3.2) return false;
+/** 「打とう！」— 画数に応じてゆるさを調整（大=簡単、茨=複雑） */
+function passesManual(m: MatchMetrics, strokeCount: number): boolean {
+  if (m.userInk < 8) return false;
+  if (m.inkRatio < 0.03 || m.inkRatio > 3.5) return false;
 
-  return (
-    m.combined >= 0.12 ||
-    m.recall >= 0.1 ||
-    m.precision >= 0.35 ||
-    (m.iou >= 0.06 && m.precision >= 0.2)
-  );
+  const shapeOk =
+    m.combined >= 0.09 ||
+    m.recall >= 0.08 ||
+    m.precision >= 0.28 ||
+    (m.iou >= 0.04 && m.precision >= 0.16);
+
+  if (!shapeOk) return false;
+
+  // 1〜3画（大・広など）: 線が細く recall が出にくい
+  if (strokeCount <= 3) {
+    return m.combined >= 0.06 || m.recall >= 0.05 || m.iou >= 0.04 || m.precision >= 0.22;
+  }
+  // 8画以上（茨など）: 全部書けなくても形が近ければ OK
+  if (strokeCount >= 8) {
+    return m.combined >= 0.07 || m.recall >= 0.06 || m.precision >= 0.24;
+  }
+  return true;
 }
 
-function passesAuto(m: MatchMetrics): boolean {
-  if (m.userInk < 16) return false;
-  if (m.inkRatio < 0.18 || m.inkRatio > 2.8) return false;
-  return m.combined >= 0.18 && m.recall >= 0.16 && m.precision >= 0.28;
+function passesAuto(m: MatchMetrics, strokeCount: number): boolean {
+  if (m.userInk < 14) return false;
+  if (m.inkRatio < 0.15 || m.inkRatio > 3.0) return false;
+  const base = m.combined >= 0.15 && m.recall >= 0.12 && m.precision >= 0.24;
+  if (strokeCount <= 3) return base || (m.combined >= 0.1 && m.precision >= 0.3);
+  if (strokeCount >= 8) return base || (m.combined >= 0.08 && m.precision >= 0.26);
+  return base;
 }
 
-/** 別の字を書いたと判断（例: 答えが県なのに道） */
 function isClearlyWrongChar(
   expectedChar: string,
   expected: MatchMetrics,
@@ -172,12 +195,19 @@ function isClearlyWrongChar(
   const top = ranked[0];
   if (top.char === expectedChar) return false;
 
+  const expectedRank = ranked.findIndex((r) => r.char === expectedChar);
   const margin = top.metrics.combined - expected.combined;
-  if (margin < WRONG_CHAR_MARGIN) return false;
-  if (top.metrics.combined < 0.14) return false;
 
-  // 正解側もそれなりに似ていれば誤差とみなして通す
-  if (expected.combined >= 0.17 && margin < WRONG_CHAR_MARGIN + 0.025) {
+  // 2〜3位でも差が小さければ正解扱い
+  if (expectedRank > 0 && expectedRank <= 2 && margin < 0.09) {
+    return false;
+  }
+
+  if (margin < WRONG_CHAR_MARGIN) return false;
+  if (top.metrics.combined < 0.13) return false;
+  if (top.metrics.precision < 0.28) return false;
+
+  if (expected.combined >= 0.14 && margin < WRONG_CHAR_MARGIN + 0.03) {
     return false;
   }
 
@@ -246,14 +276,14 @@ async function getRefMask(char: string): Promise<Uint8Array> {
   const cached = refMaskCache.get(char);
   if (cached) return cached;
   const refData = await renderReference(char);
-  const mask = dilate(normalizeMask(binarize(refData)), 2);
+  const mask = dilate(normalizeMask(binarize(refData)), 3);
   refMaskCache.set(char, mask);
   return mask;
 }
 
 function buildUserMasks(userData: ImageData): Uint8Array[] {
   const norm = normalizeMask(binarize(userData));
-  return [dilate(norm, 3), dilate(norm, 4)];
+  return [2, 3, 4, 5, 6].map((r) => dilate(norm, r));
 }
 
 function bestMetricsForChar(userMasks: Uint8Array[], refMask: Uint8Array): MatchMetrics {
@@ -292,6 +322,7 @@ export async function matchFreehandKanji(
     return { ok: false, score: 0, recall: 0 };
   }
 
+  const strokeCount = await getStrokeCount(expectedChar);
   const userMasks = buildUserMasks(rasterizeCanvas(canvas));
   const { expected, ranked } = await scoreExpectedAndRank(userMasks, expectedChar);
 
@@ -300,7 +331,7 @@ export async function matchFreehandKanji(
   }
 
   const passGate = options?.auto ? passesAuto : passesManual;
-  if (!passGate(expected)) {
+  if (!passGate(expected, strokeCount)) {
     return { ok: false, score: expected.combined, recall: expected.recall };
   }
 
@@ -314,6 +345,7 @@ export async function matchFreehandKanji(
 export function clearReferenceCache() {
   refImageCache.clear();
   refMaskCache.clear();
+  strokeCountCache.clear();
 }
 
 export function preloadBossKanjiMasks(): void {
