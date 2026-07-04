@@ -1768,6 +1768,17 @@ html.boss-no-select button {
   white-space: nowrap;
 }
 
+.boss-cheer-text--hint {
+  white-space: normal;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  max-width: 7rem;
+  color: #1e3a5f;
+  border-color: #fcd34d;
+  background: #fffbeb;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.2);
+}
+
 .boss-cheer--idle .boss-cheer-avatar {
   animation: boss-cheer-bounce 2.2s ease-in-out infinite;
 }

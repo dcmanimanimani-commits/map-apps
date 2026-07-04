@@ -324,9 +324,12 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
   const cheerText =
     attackFx === 'hit' ? 'やったー！' :
     attackFx === 'deflect' ? 'もう一度！' :
+    showHint ? `${question.answerKanji}（${question.hint}）` :
     morphChar ? 'いいね！' :
     feedback.type === 'error' ? 'だいじょうぶ！' :
     'がんばれ！';
+
+  const cheerTextClass = showHint && !attackFx ? 'boss-cheer-text boss-cheer-text--hint' : 'boss-cheer-text';
 
   const cheerClass =
     attackFx === 'hit' ? 'boss-cheer--celebrate' :
@@ -380,9 +383,6 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           <span className="boss-quiz-emoji">{question.emoji}</span>
           {question.question}
         </p>
-        {showHint && (
-          <p className="boss-quiz-hint">ヒント：{question.hint}</p>
-        )}
       </div>
 
       <div className="question-card compact boss-write-card">
@@ -434,7 +434,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       >
         <div className={`boss-cheer-slot ${cheerClass}`}>
           <PlayerAvatar level={avatarLevel} size="cheer" className="boss-cheer-avatar" />
-          <p className="boss-cheer-text">{cheerText}</p>
+          <p className={cheerTextClass}>{cheerText}</p>
         </div>
 
         <div className="boss-pad-slot">
