@@ -25,7 +25,11 @@ const MORPH_MS = 900;
 function usePadSize() {
   return useMemo(() => {
     const w = window.innerWidth;
-    return Math.min(300, Math.max(220, w * 0.55));
+    const btnCol = 112;
+    const gap = 8;
+    const edgePad = 20;
+    const maxPad = w - btnCol - gap - edgePad;
+    return Math.floor(Math.min(292, Math.max(200, Math.min(w * 0.5, maxPad))));
   }, []);
 }
 
@@ -78,12 +82,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     setMorphSnapshot(null);
     setPhase('play');
     preloadBossKanjiMasks();
-    setFeedback({
-      message: useScribble
-        ? 'Pencil → 活字（かつじ）／ 指（ゆび） → フリーハンド！「打（う）とう！」'
-        : '1文字（もじ）ずつ書（か）く！ 書（か）き終（お）わったら「打（う）とう！」',
-      type: 'info',
-    });
+    setFeedback({ message: '', type: null });
   };
 
   const triggerDeflect = useCallback((char: string) => {
@@ -390,16 +389,19 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
         <p className="char-progress">
           {morphChar
             ? '✨ 活字（かつじ）に変（か）わってる…'
-            : useScribble
-              ? 'Pencil または指（ゆび）で1文字（もじ）書（か）こう！'
-              : '白（しろ）い紙（かみ）に今（いま）の1文字（もじ）だけ書（か）いて！'}
+            : `今（いま）の1文字（もじ）を書（か）いて「打（う）とう！」`}
         </p>
       </div>
 
-      <FeedbackBanner message={feedback.message} type={feedback.type} />
+      {(feedback.type === 'success' || feedback.type === 'error') && (
+        <FeedbackBanner message={feedback.message} type={feedback.type} />
+      )}
 
-      <div className="boss-write-row">
-        <div className="hanzi-area boss-hanzi-area">
+      <div
+        className="boss-write-row"
+        style={{ '--boss-pad-size': `${padSize}px` } as React.CSSProperties}
+      >
+        <div className="boss-pad-slot">
           <div className="freehand-pad-wrap" style={{ width: padSize, height: padSize }}>
             {morphChar ? (
               <div className="kanji-morph-stage" style={{ width: padSize, height: padSize }}>
@@ -418,13 +420,6 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
               />
             )}
           </div>
-          <p className="hanzi-hint">
-            {morphChar
-              ? '活字（かつじ）になった！'
-              : useScribble
-                ? 'Pencil＝活字　指＝フリーハンド'
-                : '書（か）き終（お）わったら「打（う）とう！」'}
-          </p>
         </div>
 
         <div className="hanzi-actions boss-write-actions">

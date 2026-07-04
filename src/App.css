@@ -1691,38 +1691,56 @@ html.boss-no-select button {
 }
 
 .boss-hanzi-area {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   align-items: center;
 }
 
-.boss-hanzi-area .freehand-pad-wrap {
+.boss-hanzi-area .freehand-pad-wrap,
+.boss-pad-slot .freehand-pad-wrap {
   margin: 0;
 }
 
+.boss-pad-slot .boss-pad-mode-hint {
+  display: none;
+}
+
 .boss-write-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  position: relative;
+  width: 100%;
+  height: var(--boss-pad-size, 260px);
   flex-shrink: 0;
-  padding: 0 0.15rem;
+  margin: 0 auto;
+}
+
+.boss-pad-slot {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: var(--boss-pad-size, 260px);
+  height: var(--boss-pad-size, 260px);
 }
 
 .boss-write-actions {
+  position: absolute;
+  left: calc(50% + var(--boss-pad-size, 260px) / 2 + 0.35rem);
+  top: 50%;
+  transform: translateY(-50%);
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   padding-bottom: 0;
   flex-shrink: 0;
-  width: min(5.5rem, 22vw);
+  width: 6.75rem;
 }
 
 .boss-write-actions .btn-primary,
 .boss-write-actions .btn-secondary {
   width: 100%;
-  padding: 0.55rem 0.4rem;
-  font-size: 0.72rem;
+  padding: 0.82rem 0.55rem;
+  font-size: 0.88rem;
+  font-weight: 800;
   line-height: 1.25;
   white-space: normal;
   text-align: center;
@@ -1730,6 +1748,23 @@ html.boss-no-select button {
 
 .boss-write-actions .boss-fire-btn {
   min-width: 0;
+}
+
+.boss-battle-panel .feedback-banner {
+  margin-bottom: 0.15rem;
+  min-height: 0;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+}
+
+.boss-write-card {
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.15rem;
+}
+
+.boss-write-card .char-progress {
+  margin-top: 0.15rem;
+  margin-bottom: 0;
 }
 
 .boss-canvas {
@@ -1909,7 +1944,7 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .boss-write-card {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .boss-step-banner {
