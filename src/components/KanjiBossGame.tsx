@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getWriteKanjiChars } from '../data/prefectures';
 import { pickBossQuestions, type KanjiBossQuestion } from '../data/kanjiBossQuestions';
-import { matchFreehandKanji } from '../utils/kanjiMatch';
+import { matchFreehandKanji, preloadBossKanjiMasks } from '../utils/kanjiMatch';
 import { FreehandKanjiPad, type FreehandKanjiPadHandle } from './FreehandKanjiPad';
 import { KanjiGlyph } from './KanjiGlyph';
 import { FeedbackBanner } from './FeedbackBanner';
@@ -73,6 +73,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
     setMorphChar(null);
     setMorphSnapshot(null);
     setPhase('play');
+    preloadBossKanjiMasks();
     setFeedback({
       message: '1文字（もじ）ずつ書（か）く！ 書（か）き終（お）わると活字（かつじ）になるよ',
       type: 'info',

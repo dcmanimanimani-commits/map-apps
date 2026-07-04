@@ -1,11 +1,24 @@
+import { prefectures } from '../data/prefectures';
 import type { KanjiCharacterJson } from './kanjiWriterLoader';
 
 const GRID = 64;
 const MATCH_SIZE = 256;
 export const AUTO_IDLE_MS = 2200;
+/** 2位との差がこれ未満なら曖昧判定（別の字と紛らわしい） */
+const WIN_MARGIN = 0.022;
 
-const refCache = new Map<string, ImageData>();
+const refImageCache = new Map<string, ImageData>();
+const refMaskCache = new Map<string, Uint8Array>();
 const charDataCache = new Map<string, KanjiCharacterJson>();
+
+/** 都道府県名に出てくる漢字（道・県・府・都 など） */
+const GAME_KANJI: string[] = (() => {
+  const set = new Set<string>();
+  for (const p of prefectures) {
+    for (const c of p.kanji) set.add(c);
+  }
+  return [...set];
+})();
 
 async function loadCharData(char: string): Promise<KanjiCharacterJson> {
   const cached = charDataCache.get(char);
@@ -96,7 +109,7 @@ function normalizeMask(mask: Uint8Array): Uint8Array {
   return out;
 }
 
-interface MatchMetrics {
+export interface MatchMetrics {
   iou: number;
   recall: number;
   precision: number;
@@ -131,11 +144,6 @@ function computeMetrics(userMask: Uint8Array, refMask: Uint8Array): MatchMetrics
   };
 }
 
-/**
- * 手書き（細い線）と活字（塗り）の差を吸収したうえで判定。
- * - precision … 別の字を弾く（墨が形から外れすぎ）
- * - combined / iou / recall … 正解の字を通す（全部ANDにしない）
- */
 function passesManual(m: MatchMetrics): boolean {
   if (m.userInk < 14) return false;
   if (m.inkRatio < 0.08 || m.inkRatio > 2.6) return false;
@@ -153,6 +161,13 @@ function passesAuto(m: MatchMetrics): boolean {
   if (m.userInk < 18) return false;
   if (m.inkRatio < 0.22 || m.inkRatio > 2.4) return false;
   return m.precision >= 0.34 && m.recall >= 0.22 && m.combined >= 0.24;
+}
+
+function isBestMatch(expected: MatchMetrics, runnerUp: MatchMetrics | null): boolean {
+  if (!runnerUp) return true;
+  const margin = expected.combined - runnerUp.combined;
+  if (margin >= WIN_MARGIN) return true;
+  return margin >= 0 && expected.precision >= 0.34;
 }
 
 function canvasHasInk(canvas: HTMLCanvasElement): boolean {
@@ -180,7 +195,7 @@ function rasterizeCanvas(canvas: HTMLCanvasElement): ImageData {
 
 async function renderReference(char: string): Promise<ImageData> {
   const key = char;
-  const cached = refCache.get(key);
+  const cached = refImageCache.get(key);
   if (cached) return cached;
 
   const data = await loadCharData(char);
@@ -209,8 +224,32 @@ async function renderReference(char: string): Promise<ImageData> {
   });
 
   const imageData = ctx.getImageData(0, 0, MATCH_SIZE, MATCH_SIZE);
-  refCache.set(key, imageData);
+  refImageCache.set(key, imageData);
   return imageData;
+}
+
+async function getRefMask(char: string): Promise<Uint8Array> {
+  const cached = refMaskCache.get(char);
+  if (cached) return cached;
+  const refData = await renderReference(char);
+  const mask = dilate(normalizeMask(binarize(refData)), 1);
+  refMaskCache.set(char, mask);
+  return mask;
+}
+
+interface CharScore {
+  char: string;
+  metrics: MatchMetrics;
+}
+
+async function rankAllCandidates(userMask: Uint8Array): Promise<CharScore[]> {
+  const scores: CharScore[] = [];
+  for (const char of GAME_KANJI) {
+    const refMask = await getRefMask(char);
+    scores.push({ char, metrics: computeMetrics(userMask, refMask) });
+  }
+  scores.sort((a, b) => b.metrics.combined - a.metrics.combined);
+  return scores;
 }
 
 export async function matchFreehandKanji(
@@ -223,20 +262,45 @@ export async function matchFreehandKanji(
   }
 
   const userData = rasterizeCanvas(canvas);
-  const refData = await renderReference(expectedChar);
+  const userMask = dilate(normalizeMask(binarize(userData)), 3);
 
-  const userNorm = normalizeMask(binarize(userData));
-  const refNorm = normalizeMask(binarize(refData));
-  // 手書き線を太めに、活字側も少し膨らませて公平に比較
-  const userMask = dilate(userNorm, 3);
-  const refMask = dilate(refNorm, 1);
-  const metrics = computeMetrics(userMask, refMask);
+  const ranked = await rankAllCandidates(userMask);
+  const top = ranked[0];
+  const expectedEntry = ranked.find((r) => r.char === expectedChar);
 
-  const ok = options?.auto ? passesAuto(metrics) : passesManual(metrics);
+  if (!expectedEntry) {
+    return { ok: false, score: 0, recall: 0 };
+  }
 
-  return { ok, score: metrics.combined, recall: metrics.recall };
+  const runnerUp = ranked.find((r) => r.char !== expectedChar) ?? null;
+
+  // 書いた形が「正解の字」より別の字に近い → 不正解（例: 答えが県なのに道と書く）
+  if (top.char !== expectedChar) {
+    return { ok: false, score: expectedEntry.metrics.combined, recall: expectedEntry.metrics.recall };
+  }
+
+  const passGate = options?.auto ? passesAuto : passesManual;
+  if (!passGate(expectedEntry.metrics)) {
+    return { ok: false, score: expectedEntry.metrics.combined, recall: expectedEntry.metrics.recall };
+  }
+
+  if (!isBestMatch(expectedEntry.metrics, runnerUp?.metrics ?? null)) {
+    return { ok: false, score: expectedEntry.metrics.combined, recall: expectedEntry.metrics.recall };
+  }
+
+  return {
+    ok: true,
+    score: expectedEntry.metrics.combined,
+    recall: expectedEntry.metrics.recall,
+  };
 }
 
 export function clearReferenceCache() {
-  refCache.clear();
+  refImageCache.clear();
+  refMaskCache.clear();
+}
+
+/** ボス開始時に漢字マスクを先読み（初回判定を速く） */
+export function preloadBossKanjiMasks(): void {
+  void Promise.all(GAME_KANJI.map((char) => getRefMask(char)));
 }
