@@ -292,7 +292,7 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       <div className="game-screen kanji-write-screen boss-screen">
         <div className="clear-card">
           <span className="clear-emoji">🏆</span>
-          <h2>勝（か）利（り）！</h2>
+          <h2>勝利！</h2>
           <p>もんだい大王（だいおう）をたおした！</p>
           <div className="finish-actions">
             <button className="btn-primary" onClick={startGame}>もう一度</button>
