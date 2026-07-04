@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getWriteKanjiChars } from '../data/prefectures';
 import { pickBossQuestions, type KanjiBossQuestion } from '../data/kanjiBossQuestions';
+import { BOSS_IMAGE } from '../data/characterAssets';
 import { supportsAppleScribble } from '../utils/device';
 import { preloadBossKanjiMasks } from '../utils/kanjiMatch';
 import { HybridKanjiPad, type HybridKanjiPadHandle } from './HybridKanjiPad';
@@ -245,7 +246,10 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
           <h2>👹 漢字ボスたたき</h2>
         </header>
         <div className="boss-intro-card">
-          <span className="boss-intro-emoji">👹🗾</span>
+          <div className="boss-intro-hero">
+            <img src={BOSS_IMAGE} alt="" className="boss-intro-img" width={120} height={120} />
+            <span className="boss-intro-map" aria-hidden>🗾</span>
+          </div>
           <h3>もんだい大王（だいおう）が現（あらわ）れた！</h3>
           <p>名物（めいぶつ）のクイズに答（こた）えて、</p>
           <p>白（しろ）い紙（かみ）に漢字（かんじ）を書（か）いて攻（せ）めよう！</p>
@@ -312,9 +316,13 @@ export function KanjiBossGame({ onBack }: KanjiBossGameProps) {
       <div className="boss-arena">
         <div className="boss-status">
           <div className="boss-face-wrap">
-            <span className={`boss-face ${bossShake ? 'boss-face--hit' : ''} ${attackFx === 'deflect' ? 'boss-face--block' : ''}`}>
-              👹
-            </span>
+            <img
+              src={BOSS_IMAGE}
+              alt=""
+              className={`boss-face-img ${bossShake ? 'boss-face--hit' : ''} ${attackFx === 'deflect' ? 'boss-face--block' : ''}`}
+              width={80}
+              height={80}
+            />
             {attackFx && (
               <span className={`boss-bullet boss-bullet--${attackFx}`} aria-hidden>
                 {bulletChar}

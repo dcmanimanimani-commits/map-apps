@@ -1323,10 +1323,24 @@ html.boss-no-select button {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
-.boss-intro-emoji {
-  font-size: 3rem;
-  display: block;
+.boss-intro-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.boss-intro-img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+.boss-intro-map {
+  font-size: 2.5rem;
+  line-height: 1;
 }
 
 .boss-intro-card h3 {
@@ -1368,17 +1382,19 @@ html.boss-no-select button {
 
 .boss-face-wrap {
   position: relative;
-  height: 64px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.boss-face {
-  font-size: 3rem;
-  line-height: 1;
+.boss-face-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
   display: inline-block;
   transition: transform 0.15s;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
 }
 
 .boss-face--hit {
@@ -2084,10 +2100,12 @@ html.boss-no-select .scribble-kanji-input {
   overflow: hidden;
 }
 
-.player-avatar-svg {
+.player-avatar-img {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .clear-avatar {
