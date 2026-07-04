@@ -4,14 +4,14 @@ import type { KanjiCharacterJson } from './kanjiWriterLoader';
 const GRID = 64;
 const MATCH_SIZE = 256;
 export const AUTO_IDLE_MS = 2200;
-/** 2位との差がこれ未満なら曖昧判定（別の字と紛らわしい） */
-const WIN_MARGIN = 0.022;
+
+/** 別の字が正解よりこれ以上上回ったら「別の字を書いた」とみなす */
+const WRONG_CHAR_MARGIN = 0.055;
 
 const refImageCache = new Map<string, ImageData>();
 const refMaskCache = new Map<string, Uint8Array>();
 const charDataCache = new Map<string, KanjiCharacterJson>();
 
-/** 都道府県名に出てくる漢字（道・県・府・都 など） */
 const GAME_KANJI: string[] = (() => {
   const set = new Set<string>();
   for (const p of prefectures) {
@@ -144,30 +144,44 @@ function computeMetrics(userMask: Uint8Array, refMask: Uint8Array): MatchMetrics
   };
 }
 
+/** 「打とう！」— 小学生の手書き向けにゆるめ */
 function passesManual(m: MatchMetrics): boolean {
-  if (m.userInk < 14) return false;
-  if (m.inkRatio < 0.08 || m.inkRatio > 2.6) return false;
-  if (m.precision < 0.27) return false;
+  if (m.userInk < 10) return false;
+  if (m.inkRatio < 0.05 || m.inkRatio > 3.2) return false;
 
-  const shapeOk =
-    m.combined >= 0.19 ||
-    (m.iou >= 0.1 && m.precision >= 0.32) ||
-    (m.recall >= 0.15 && m.precision >= 0.3);
-
-  return shapeOk;
+  return (
+    m.combined >= 0.12 ||
+    m.recall >= 0.1 ||
+    m.precision >= 0.35 ||
+    (m.iou >= 0.06 && m.precision >= 0.2)
+  );
 }
 
 function passesAuto(m: MatchMetrics): boolean {
-  if (m.userInk < 18) return false;
-  if (m.inkRatio < 0.22 || m.inkRatio > 2.4) return false;
-  return m.precision >= 0.34 && m.recall >= 0.22 && m.combined >= 0.24;
+  if (m.userInk < 16) return false;
+  if (m.inkRatio < 0.18 || m.inkRatio > 2.8) return false;
+  return m.combined >= 0.18 && m.recall >= 0.16 && m.precision >= 0.28;
 }
 
-function isBestMatch(expected: MatchMetrics, runnerUp: MatchMetrics | null): boolean {
-  if (!runnerUp) return true;
-  const margin = expected.combined - runnerUp.combined;
-  if (margin >= WIN_MARGIN) return true;
-  return margin >= 0 && expected.precision >= 0.34;
+/** 別の字を書いたと判断（例: 答えが県なのに道） */
+function isClearlyWrongChar(
+  expectedChar: string,
+  expected: MatchMetrics,
+  ranked: { char: string; metrics: MatchMetrics }[],
+): boolean {
+  const top = ranked[0];
+  if (top.char === expectedChar) return false;
+
+  const margin = top.metrics.combined - expected.combined;
+  if (margin < WRONG_CHAR_MARGIN) return false;
+  if (top.metrics.combined < 0.14) return false;
+
+  // 正解側もそれなりに似ていれば誤差とみなして通す
+  if (expected.combined >= 0.17 && margin < WRONG_CHAR_MARGIN + 0.025) {
+    return false;
+  }
+
+  return true;
 }
 
 function canvasHasInk(canvas: HTMLCanvasElement): boolean {
@@ -232,24 +246,41 @@ async function getRefMask(char: string): Promise<Uint8Array> {
   const cached = refMaskCache.get(char);
   if (cached) return cached;
   const refData = await renderReference(char);
-  const mask = dilate(normalizeMask(binarize(refData)), 1);
+  const mask = dilate(normalizeMask(binarize(refData)), 2);
   refMaskCache.set(char, mask);
   return mask;
 }
 
-interface CharScore {
-  char: string;
-  metrics: MatchMetrics;
+function buildUserMasks(userData: ImageData): Uint8Array[] {
+  const norm = normalizeMask(binarize(userData));
+  return [dilate(norm, 3), dilate(norm, 4)];
 }
 
-async function rankAllCandidates(userMask: Uint8Array): Promise<CharScore[]> {
-  const scores: CharScore[] = [];
+function bestMetricsForChar(userMasks: Uint8Array[], refMask: Uint8Array): MatchMetrics {
+  let best = computeMetrics(userMasks[0], refMask);
+  for (let i = 1; i < userMasks.length; i++) {
+    const m = computeMetrics(userMasks[i], refMask);
+    if (m.combined > best.combined) best = m;
+  }
+  return best;
+}
+
+async function scoreExpectedAndRank(
+  userMasks: Uint8Array[],
+  expectedChar: string,
+): Promise<{ expected: MatchMetrics; ranked: { char: string; metrics: MatchMetrics }[] }> {
+  const ranked: { char: string; metrics: MatchMetrics }[] = [];
+  let expected: MatchMetrics | null = null;
+
   for (const char of GAME_KANJI) {
     const refMask = await getRefMask(char);
-    scores.push({ char, metrics: computeMetrics(userMask, refMask) });
+    const metrics = bestMetricsForChar(userMasks, refMask);
+    if (char === expectedChar) expected = metrics;
+    ranked.push({ char, metrics });
   }
-  scores.sort((a, b) => b.metrics.combined - a.metrics.combined);
-  return scores;
+
+  ranked.sort((a, b) => b.metrics.combined - a.metrics.combined);
+  return { expected: expected!, ranked };
 }
 
 export async function matchFreehandKanji(
@@ -261,38 +292,23 @@ export async function matchFreehandKanji(
     return { ok: false, score: 0, recall: 0 };
   }
 
-  const userData = rasterizeCanvas(canvas);
-  const userMask = dilate(normalizeMask(binarize(userData)), 3);
+  const userMasks = buildUserMasks(rasterizeCanvas(canvas));
+  const { expected, ranked } = await scoreExpectedAndRank(userMasks, expectedChar);
 
-  const ranked = await rankAllCandidates(userMask);
-  const top = ranked[0];
-  const expectedEntry = ranked.find((r) => r.char === expectedChar);
-
-  if (!expectedEntry) {
+  if (!expected) {
     return { ok: false, score: 0, recall: 0 };
   }
 
-  const runnerUp = ranked.find((r) => r.char !== expectedChar) ?? null;
-
-  // 書いた形が「正解の字」より別の字に近い → 不正解（例: 答えが県なのに道と書く）
-  if (top.char !== expectedChar) {
-    return { ok: false, score: expectedEntry.metrics.combined, recall: expectedEntry.metrics.recall };
-  }
-
   const passGate = options?.auto ? passesAuto : passesManual;
-  if (!passGate(expectedEntry.metrics)) {
-    return { ok: false, score: expectedEntry.metrics.combined, recall: expectedEntry.metrics.recall };
+  if (!passGate(expected)) {
+    return { ok: false, score: expected.combined, recall: expected.recall };
   }
 
-  if (!isBestMatch(expectedEntry.metrics, runnerUp?.metrics ?? null)) {
-    return { ok: false, score: expectedEntry.metrics.combined, recall: expectedEntry.metrics.recall };
+  if (isClearlyWrongChar(expectedChar, expected, ranked)) {
+    return { ok: false, score: expected.combined, recall: expected.recall };
   }
 
-  return {
-    ok: true,
-    score: expectedEntry.metrics.combined,
-    recall: expectedEntry.metrics.recall,
-  };
+  return { ok: true, score: expected.combined, recall: expected.recall };
 }
 
 export function clearReferenceCache() {
@@ -300,7 +316,6 @@ export function clearReferenceCache() {
   refMaskCache.clear();
 }
 
-/** ボス開始時に漢字マスクを先読み（初回判定を速く） */
 export function preloadBossKanjiMasks(): void {
   void Promise.all(GAME_KANJI.map((char) => getRefMask(char)));
 }
