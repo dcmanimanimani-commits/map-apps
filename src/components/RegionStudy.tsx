@@ -19,10 +19,6 @@ interface RegionStudyProps {
 
 type Phase = 'learn' | 'quiz' | 'clear';
 
-function passScoreFor(count: number): number {
-  return Math.ceil(count * 0.75);
-}
-
 export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer }: RegionStudyProps) {
   const { masterRegion } = usePlayer();
   const region = getStudyRegion(regionId);
@@ -31,7 +27,6 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
     [regionId],
   );
   const quizGoal = prefs.length;
-  const passScore = passScoreFor(quizGoal);
 
   const regionLabel = region?.name ?? '';
 
@@ -70,12 +65,12 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
 
   const advanceQuiz = useCallback((newScore: number, newAnswered: number) => {
     if (newAnswered >= quizGoal) {
-      if (newScore >= passScore) {
+      if (newScore === quizGoal) {
         const updated = masterRegion(regionId);
         setNewTitle(updated.title);
         setPhase('clear');
       } else {
-        setFeedback({ message: 'もう少し！べんきょうしてからもう一度', type: 'error' });
+        setFeedback({ message: `全問正解でクリア！ ${newScore}/${quizGoal}…もう一度`, type: 'error' });
         setTimeout(() => {
           setPhase('learn');
           setCorrectKanji(null);
@@ -92,7 +87,7 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
     setWrongKanji(null);
     setLocked(false);
     setFeedback({ message: 'この県はどこ？地図をタップ！', type: 'info' });
-  }, [quizGoal, passScore, quizIndex, masterRegion, regionId]);
+  }, [quizGoal, quizIndex, masterRegion, regionId]);
 
   const handleLearnTap = (kanji: string) => {
     if (!activeKanjiSet.has(kanji)) return;
@@ -206,7 +201,7 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
         <h2>{region.emoji} {regionLabel}クイズ</h2>
       </header>
 
-      <div className="quiz-score">🎯 {score} / {quizGoal}（{passScore}問以上でクリア）</div>
+      <div className="quiz-score">🎯 {score} / {quizGoal}（全問正解でクリア）</div>
 
       <div className="question-card compact">
         <p className="question-label">この県はどこ？</p>
