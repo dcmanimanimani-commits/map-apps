@@ -43,8 +43,7 @@ export function MapCharacterSprite({
         top: y,
         width: size,
         height: size,
-        marginLeft: -size / 2,
-        marginTop: -size / 2,
+        transform: 'translate(-50%, -50%)',
       }}
       aria-hidden={!label}
       title={label}

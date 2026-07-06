@@ -38,10 +38,12 @@ export function getCamera(
   viewportH: number,
   worldW: number,
   worldH: number,
+  /** 画面上でキャラを右(+x)・下(+y)に見せる補正（画像の重心ずれ用） */
+  screenBias: MapPoint = { x: 0, y: 0 },
 ): MapPoint {
   return {
-    x: Math.max(0, Math.min(worldW - viewportW, player.x - viewportW / 2)),
-    y: Math.max(0, Math.min(worldH - viewportH, player.y - viewportH / 2)),
+    x: Math.max(0, Math.min(worldW - viewportW, player.x - viewportW / 2 - screenBias.x)),
+    y: Math.max(0, Math.min(worldH - viewportH, player.y - viewportH / 2 - screenBias.y)),
   };
 }
 

@@ -41,6 +41,8 @@ const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 152;
 const ONI_SIZE = 184;
+/** 画像の重心が幾何中心より左寄りの分を画面中央に合わせる */
+const PLAYER_SCREEN_BIAS = { x: Math.round(CHAR_SIZE * 0.06), y: 0 };
 /** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
 const PLAYER_FOLLOW_RATE = 0.036125;
 
@@ -137,7 +139,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, [viewW]);
 
   const camera = useMemo(
-    () => getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height),
+    () => getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height, PLAYER_SCREEN_BIAS),
     [playerPos, viewW, viewH, worldSize.width, worldSize.height],
   );
 
@@ -202,7 +204,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const rect = el.getBoundingClientRect();
     const { width: vw, height: vh } = viewSizeRef.current;
     const { width: ww, height: wh } = worldSizeRef.current;
-    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
+    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh, PLAYER_SCREEN_BIAS);
     const touch = clientToWorld(ptr.clientX, ptr.clientY, rect, cam);
     const before = playerPosRef.current;
     const targetX = touch.x - ptr.grabOffsetX;
@@ -234,7 +236,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const rect = el.getBoundingClientRect();
     const { width: vw, height: vh } = viewSizeRef.current;
     const { width: ww, height: wh } = worldSizeRef.current;
-    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
+    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh, PLAYER_SCREEN_BIAS);
     return clientToWorld(clientX, clientY, rect, cam);
   }, []);
 
