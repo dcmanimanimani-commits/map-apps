@@ -342,7 +342,6 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, [phase, worldSize.width]);
 
   const playerStep = stepFromMotion(isMoving, animFrame);
-  const playerDir = lastDirRef.current;
   const oniStep = oniActive ? stepFromMotion(true, animFrame) : 'idle';
   const oniDir: CharDirection = oniPos
     ? directionFromVector(playerPos.x - oniPos.x, playerPos.y - oniPos.y)
@@ -485,9 +484,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       x={playerPos.x}
                       y={playerPos.y}
                       size={CHAR_SIZE}
-                      imageSrc={getAvatarSpriteSrc(chosenAvatar, playerDir, playerStep)}
-                      fallbackSrc={getAvatarFallbackSrc(chosenAvatar)}
-                      direction={playerDir}
+                      imageSrc={getAvatarFallbackSrc(chosenAvatar)}
+                      direction="down"
                       step={playerStep}
                       className="map-char--player"
                       interactive

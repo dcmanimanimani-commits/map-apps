@@ -2923,6 +2923,18 @@ html.boss-no-select .scribble-kanji-input {
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
 }
 
+.map-char--player .map-char-img {
+  transform: none;
+}
+
+.map-char--player.map-char--moving.map-char--rightFoot .map-char-img {
+  animation: map-char-walk 0.28s ease-in-out infinite alternate;
+}
+
+.map-char--player.map-char--moving.map-char--leftFoot .map-char-img {
+  animation: map-char-walk 0.28s ease-in-out infinite alternate-reverse;
+}
+
 .map-char--left .map-char-img {
   transform: scaleX(-1);
 }
