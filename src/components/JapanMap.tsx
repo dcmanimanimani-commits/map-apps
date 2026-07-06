@@ -4,7 +4,8 @@ import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
 import { getRegionColor, getShortHiragana, getShortKanji, prefectureByKanji } from '../data/prefectures';
 import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
-import { getPrefectureLabelLayout } from '../utils/mapLabels';
+import { getPrefectureLabelLayout, allowsSeaPrefectureLabel } from '../utils/mapLabels';
+import { prefectureCapitalByKanji } from '../data/prefectureCapitals';
 import {
   createMainlandPathGenerator,
   createOkinawaFullPathGenerator,
@@ -156,8 +157,33 @@ export function JapanMap({
     const pref = prefectureByKanji.get(kanji);
     const name = getShortKanji(kanji);
     const hiragana = pref ? getShortHiragana(kanji, pref.hiragana) : '';
+    const seaLabel = allowOutside || allowsSeaPrefectureLabel(kanji);
+
+    if (seaLabel && kanji !== OKINAWA_KANJI) {
+      const capital = prefectureCapitalByKanji.get(kanji);
+      const projection = pathGen.projection();
+      if (capital && projection && typeof projection === 'function') {
+        const projected = (projection as (coords: [number, number]) => [number, number] | null)([
+          capital.lon,
+          capital.lat,
+        ]);
+        if (projected) {
+          const fontSize = Math.max(6, Math.min(maxFontSize, 12));
+          return {
+            kanji,
+            name,
+            hiragana,
+            x: projected[0],
+            y: projected[1],
+            fontSize,
+            clip: false,
+          };
+        }
+      }
+    }
+
     const layout = getPrefectureLabelLayout(feature, pathGen, name, hiragana, maxFontSize, {
-      allowOutside,
+      allowOutside: seaLabel,
     });
     if (!layout) return null;
     return {
@@ -191,7 +217,7 @@ export function JapanMap({
     }
 
     for (const { kanji, pathGen, feature, d } of mainlandPaths) {
-      const label = buildLabel(kanji, feature, pathGen, d, labelFontSize);
+      const label = buildLabel(kanji, feature, pathGen, d, labelFontSize, allowsSeaPrefectureLabel(kanji));
       if (label) items.push(label);
     }
 

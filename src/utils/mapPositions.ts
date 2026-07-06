@@ -12,6 +12,7 @@ import {
   OKINAWA_INSET_SCALE_FULL,
 } from './geo';
 import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from './geoTransform';
+import { geometryToProjectedRings, pointInPolygon } from './mapLabels';
 
 export interface MapPoint {
   x: number;
@@ -132,6 +133,75 @@ export function buildPrefectureCapitalPositions(
   }
 
   return positions;
+}
+
+function pointInPrefectureRings(point: MapPoint, rings: [number, number][][]): boolean {
+  for (const ring of rings) {
+    if (ring.length >= 3 && pointInPolygon(point.x, point.y, ring)) return true;
+  }
+  return false;
+}
+
+/** 地図座標からその地点の都道府県（漢字名）を返す */
+export function findPrefectureAtPoint(
+  point: MapPoint,
+  geo: JapanGeoJSON,
+  width: number,
+  height: number,
+): string | null {
+  const { mainland, okinawa } = splitMainlandAndOkinawa(geo);
+
+  if (okinawa) {
+    const layout = getOkinawaInsetLayout(width, height);
+    if (point.x >= layout.cornerX && point.y >= layout.cornerY) {
+      const insetPathGen = createOkinawaInsetPathGenerator(
+        okinawa,
+        layout,
+        width,
+        height,
+        OKINAWA_INSET_SCALE_FULL,
+      );
+      const insetProjection = insetPathGen.projection();
+      if (insetProjection && typeof insetProjection === 'function') {
+        const project = insetProjection as (coords: [number, number]) => [number, number] | null;
+        const rings = geometryToProjectedRings(simplifyOkinawaForInset(okinawa).geometry, project);
+        if (pointInPrefectureRings(point, rings)) return OKINAWA_KANJI;
+      }
+    }
+  }
+
+  const mainlandPathGen = createMainlandPathGenerator(mainland, width, height);
+  const projection = mainlandPathGen.projection();
+  if (!projection || typeof projection !== 'function') return null;
+  const project = projection as (coords: [number, number]) => [number, number] | null;
+
+  for (const feature of mainland.features) {
+    const kanji = getFeatureKanji(feature as Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>);
+    const rings = geometryToProjectedRings(
+      (feature as Feature<Geometry, GeoJsonProperties>).geometry,
+      project,
+    );
+    if (pointInPrefectureRings(point, rings)) return kanji;
+  }
+
+  return null;
+}
+
+/** 地点に対応する県がないとき、最も近い県庁所在地の県を返す */
+export function findNearestPrefectureByCapital(
+  point: MapPoint,
+  capitals: Map<string, MapPoint>,
+): string | null {
+  let bestKanji: string | null = null;
+  let bestDist = Infinity;
+  for (const [kanji, pos] of capitals) {
+    const d = mapDistance(point, pos);
+    if (d < bestDist) {
+      bestDist = d;
+      bestKanji = kanji;
+    }
+  }
+  return bestKanji;
 }
 
 export function mapDistance(a: MapPoint, b: MapPoint): number {

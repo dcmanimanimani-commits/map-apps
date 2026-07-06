@@ -159,6 +159,20 @@ export interface PrefectureLabelLayout {
   clip: boolean;
 }
 
+/** 沖縄・長崎は海側表示を許可 */
+export const SEA_LABEL_PREFECTURES = new Set(['沖縄県', '長崎県']);
+
+export function allowsSeaPrefectureLabel(kanji: string): boolean {
+  return SEA_LABEL_PREFECTURES.has(kanji);
+}
+
+export function geometryToProjectedRings(
+  geometry: Geometry,
+  project: (coords: [number, number]) => [number, number] | null,
+): Point[][] {
+  return geometryToRings(geometry, project);
+}
+
 export function getPrefectureLabelLayout(
   feature: Feature<Geometry, GeoJsonProperties>,
   pathGen: GeoPath,

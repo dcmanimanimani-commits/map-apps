@@ -7,9 +7,10 @@ import { resolveAvatarLevel } from '../data/progress';
 import { BOSS_IMAGE } from '../data/characterAssets';
 import {
   buildPrefectureCapitalPositions,
-  buildPrefectureCentroids,
   buildWorldSize,
   clampToMap,
+  findNearestPrefectureByCapital,
+  findPrefectureAtPoint,
   getCamera,
   mapDistance,
   moveToward,
@@ -41,38 +42,46 @@ const CATCH_RADIUS = 34;
 const CHAR_SIZE = 76;
 const ONI_SIZE = 92;
 
-function pickStartAndGoal(
-  centroids: Map<string, MapPoint>,
-  capitals: Map<string, MapPoint>,
-): {
+const START_EXCLUDED_KANJI = new Set(['北海道', '沖縄県']);
+const START_REGIONS = new Set(['東北', '関東', '中部', '近畿', '中国', '四国', '九州']);
+
+function isMainlandStartPrefecture(pref: Prefecture): boolean {
+  if (START_EXCLUDED_KANJI.has(pref.kanji)) return false;
+  return START_REGIONS.has(pref.region);
+}
+
+function pickStartAndGoal(capitals: Map<string, MapPoint>): {
   start: Prefecture;
   goal: Prefecture;
   startPos: MapPoint;
   goalPos: MapPoint;
 } {
-  const available = prefectures.filter((p) => centroids.has(p.kanji) && capitals.has(p.kanji));
+  const available = prefectures.filter((p) => capitals.has(p.kanji));
   const goal = available[Math.floor(Math.random() * available.length)];
-  const others = available.filter((p) => p.kanji !== goal.kanji);
-  const start = others[Math.floor(Math.random() * others.length)];
+  const startPool = available.filter((p) => p.kanji !== goal.kanji && isMainlandStartPrefecture(p));
+  const start = startPool[Math.floor(Math.random() * startPool.length)] ?? available.find((p) => p.kanji !== goal.kanji)!;
   return {
     start,
     goal,
-    startPos: centroids.get(start.kanji)!,
+    startPos: capitals.get(start.kanji)!,
     goalPos: capitals.get(goal.kanji)!,
   };
 }
 
-function pickOniSpawn(centroids: Map<string, MapPoint>, player: MapPoint): MapPoint {
-  let best: MapPoint = { x: 40, y: 40 };
-  let bestDist = -1;
-  for (const pos of centroids.values()) {
-    const d = mapDistance(pos, player);
-    if (d > bestDist) {
-      bestDist = d;
-      best = pos;
-    }
+function pickOniSpawn(
+  player: MapPoint,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  capitals: Map<string, MapPoint>,
+): MapPoint {
+  const prefecture =
+    findPrefectureAtPoint(player, geo, worldW, worldH) ??
+    findNearestPrefectureByCapital(player, capitals);
+  if (prefecture && capitals.has(prefecture)) {
+    return capitals.get(prefecture)!;
   }
-  return best;
+  return capitals.values().next().value ?? player;
 }
 
 function stepFromMotion(moving: boolean, frame: number): CharStep {
@@ -119,15 +128,13 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   phaseRef.current = phase;
   worldSizeRef.current = worldSize;
 
-  const centroids = useMemo(() => {
-    if (worldSize.width < 200) return new Map<string, MapPoint>();
-    return buildPrefectureCentroids(geo, worldSize.width, worldSize.height);
-  }, [geo, worldSize.width, worldSize.height]);
-
   const capitals = useMemo(() => {
     if (worldSize.width < 200) return new Map<string, MapPoint>();
     return buildPrefectureCapitalPositions(geo, worldSize.width, worldSize.height);
   }, [geo, worldSize.width, worldSize.height]);
+
+  const capitalsRef = useRef(capitals);
+  capitalsRef.current = capitals;
 
   const camera = useMemo(
     () => getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height),
@@ -135,7 +142,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   );
 
   const initRound = useCallback(() => {
-    const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(centroids, capitals);
+    const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(capitals);
     setStartPref(start);
     setGoalPref(goal);
     goalPosRef.current = goalSpot;
@@ -151,7 +158,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setAnimFrame(0);
     setIsMoving(false);
     pointerRef.current = { active: false, lastClientX: 0, lastClientY: 0 };
-  }, [centroids, capitals]);
+  }, [capitals]);
 
   const requestStart = useCallback(() => {
     setPhase('play');
@@ -159,10 +166,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, []);
 
   useEffect(() => {
-    if (!pendingStart || phase !== 'play' || worldSize.width < 200 || centroids.size === 0 || capitals.size === 0) return;
+    if (!pendingStart || phase !== 'play' || worldSize.width < 200 || capitals.size === 0) return;
     initRound();
     setPendingStart(false);
-  }, [pendingStart, phase, worldSize.width, centroids.size, capitals.size, initRound]);
+  }, [pendingStart, phase, worldSize.width, capitals.size, initRound]);
 
   const handlePlayerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'play') return;
@@ -217,7 +224,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     let introClearTimer: number | undefined;
 
     const oniTimer = window.setTimeout(() => {
-      const spawn = pickOniSpawn(centroids, playerPosRef.current);
+      const { width: ww, height: wh } = worldSizeRef.current;
+      const spawn = pickOniSpawn(playerPosRef.current, geo, ww, wh, capitalsRef.current);
       setOniPos(spawn);
       oniPosRef.current = spawn;
       setOniActive(true);
@@ -273,7 +281,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       clearInterval(countInterval);
       cancelAnimationFrame(raf);
     };
-  }, [phase, centroids, worldSize.width]);
+  }, [phase, geo, worldSize.width]);
 
   const playerStep = stepFromMotion(isMoving, animFrame);
   const playerDir = lastDirRef.current;
@@ -294,9 +302,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           <ul className="adventure-intro-rules">
             <li>ひとつ選ばれた県の<strong>県庁所在地（◎）</strong>へたどり着け！</li>
             <li>🗾 各県に◎マーク。見た目ではどれがゴールかわからない</li>
+            <li>🚩 スタートは本州・四国・九州の県庁所在地</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
-            <li>👹 開始<strong>3秒後</strong>、もんだい大王が追いかけてくる！</li>
+            <li>👹 3秒後、<strong>いまいる県</strong>の県庁所在地から鬼が現れる！</li>
           </ul>
           <button type="button" className="btn-primary" onClick={requestStart}>たんけんスタート！</button>
         </div>
@@ -346,9 +355,16 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       <PlayerStatus />
 
       <div className="adventure-hud">
-        <p className="adventure-goal">
-          <strong>{goalPref?.kanji}</strong>の県庁所在地（◎）へ！
-        </p>
+        <div className="adventure-goal-banner">
+          <span className="adventure-goal-eyebrow">もくてきち</span>
+          <p className="adventure-goal-main">
+            <span className="adventure-goal-kanji">{goalPref?.kanji}</span>
+            <span className="adventure-goal-tail">の県庁所在地 ◎ へ！</span>
+          </p>
+          {goalPref && (
+            <p className="adventure-goal-hiragana">（{goalPref.hiragana}）</p>
+          )}
+        </div>
         {!oniActive && countdown > 0 && (
           <p className="adventure-countdown">鬼まで {countdown}…</p>
         )}
@@ -430,7 +446,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       </div>
 
       {startPref && (
-        <p className="adventure-start-hint">スタート：{startPref.kanji}</p>
+        <p className="adventure-start-hint">スタート：{startPref.kanji}の県庁所在地</p>
       )}
     </div>
   );
