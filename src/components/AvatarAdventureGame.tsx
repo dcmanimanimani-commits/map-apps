@@ -20,7 +20,6 @@ import {
 import {
   directionFromVector,
   getAvatarFallbackSrc,
-  getAvatarSpriteSrc,
   getOniSpriteSrc,
   type CharDirection,
   type CharStep,
