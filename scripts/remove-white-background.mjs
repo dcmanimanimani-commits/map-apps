@@ -11,8 +11,8 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const CHAR_DIR = path.join(ROOT, 'public', 'characters');
 const SPRITE_DIR = path.join(CHAR_DIR, 'sprites');
 
-const AVATAR_BG_TOLERANCE = 58;
-const AVATAR_EDGE_SOFTNESS = 42;
+const AVATAR_BG_TOLERANCE = 52;
+const AVATAR_EDGE_SOFTNESS = 14;
 /** 鬼大王は外周の暗い背景だけ軽く透過（旗・本体は残す） */
 const BOSS_BG_TOLERANCE = 28;
 const BOSS_EDGE_SOFTNESS = 18;
@@ -89,10 +89,27 @@ function floodFillBackground(data, width, height, tolerance, edgeSoftness) {
     queue.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
   }
 
+  // 背景以外は不透明に（キャラ内部のベージュ系も半透明にしない）
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
       if (visited[idx]) continue;
+      data[idx * 4 + 3] = 255;
+    }
+  }
+
+  // 輪郭の1pxだけアンチエイリアス（背景に接する画素のみ）
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x;
+      if (visited[idx]) continue;
+
+      let touchesBg = false;
+      if (x > 0 && visited[idx - 1]) touchesBg = true;
+      else if (x < width - 1 && visited[idx + 1]) touchesBg = true;
+      else if (y > 0 && visited[idx - width]) touchesBg = true;
+      else if (y < height - 1 && visited[idx + width]) touchesBg = true;
+      if (!touchesBg) continue;
 
       const pi = idx * 4;
       const r = data[pi];
@@ -102,7 +119,7 @@ function floodFillBackground(data, width, height, tolerance, edgeSoftness) {
 
       if (dist <= tolerance + edgeSoftness) {
         const fade = (tolerance + edgeSoftness - dist) / edgeSoftness;
-        data[pi + 3] = Math.round(data[pi + 3] * (1 - Math.min(1, Math.max(0, fade))));
+        data[pi + 3] = Math.round(255 * (1 - Math.min(1, Math.max(0, fade))));
       }
     }
   }
@@ -137,8 +154,13 @@ function isBossImage(filePath) {
 
 async function processFile(filePath) {
   const boss = isBossImage(filePath);
-  const tolerance = boss ? BOSS_BG_TOLERANCE : AVATAR_BG_TOLERANCE;
-  const edgeSoftness = boss ? BOSS_EDGE_SOFTNESS : AVATAR_EDGE_SOFTNESS;
+  if (boss) {
+    console.log(`  skip ${path.relative(ROOT, filePath)} (boss unchanged)`);
+    return;
+  }
+
+  const tolerance = AVATAR_BG_TOLERANCE;
+  const edgeSoftness = AVATAR_EDGE_SOFTNESS;
 
   const { data, info } = await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const bg = floodFillBackground(data, info.width, info.height, tolerance, edgeSoftness);
@@ -158,6 +180,7 @@ async function processFile(filePath) {
 
 function syncStagedFiles(files) {
   for (const filePath of files) {
+    if (isBossImage(filePath)) continue;
     const rel = path.relative(CHAR_DIR, filePath);
     const staged = path.join(CHAR_DIR, '_processed', rel);
     const from = staged.replace(/'/g, "''");
