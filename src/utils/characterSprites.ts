@@ -3,13 +3,37 @@ import { AVATAR_IMAGES, BOSS_IMAGE, type AvatarLevel } from '../data/characterAs
 export type CharDirection = 'up' | 'right' | 'down' | 'left';
 export type CharStep = 'idle' | 'rightFoot' | 'leftFoot';
 
-/**
- * 16コマ構成: 4方向 ×（静止・右足前・左足前）
- * 将来 /characters/sprites/avatar-N/{dir}-{step}.webp を置けば差し替え可能。
- * 現状は単一WebP + CSSアニメで表現。
- */
-export function getAvatarSpriteSrc(level: AvatarLevel, _dir: CharDirection, _step: CharStep): string {
+/** 1キャラ16枚 = 4方向 × 4コマ（idle + walk1〜3） */
+export type AvatarSpriteFrame = 'idle' | 'walk1' | 'walk2' | 'walk3';
+
+export const AVATAR_DIRECTIONS: CharDirection[] = ['up', 'right', 'down', 'left'];
+export const AVATAR_SPRITE_FRAMES: AvatarSpriteFrame[] = ['idle', 'walk1', 'walk2', 'walk3'];
+
+const SPRITE_ROOT = '/characters/sprites';
+
+export function charStepToSpriteFrame(step: CharStep): AvatarSpriteFrame {
+  if (step === 'idle') return 'idle';
+  if (step === 'rightFoot') return 'walk1';
+  return 'walk2';
+}
+
+/** 透過WebP/PNGを置くパス（例: /characters/sprites/avatar-3/down-walk1.webp） */
+export function getAvatarSpritePath(
+  level: AvatarLevel,
+  dir: CharDirection,
+  step: CharStep,
+): string {
+  const frame = charStepToSpriteFrame(step);
+  return `${SPRITE_ROOT}/avatar-${level}/${dir}-${frame}.webp`;
+}
+
+/** 16枚スプライトが未配置のときのフォールバック（単体画像） */
+export function getAvatarFallbackSrc(level: AvatarLevel): string {
   return AVATAR_IMAGES[level];
+}
+
+export function getAvatarSpriteSrc(level: AvatarLevel, dir: CharDirection, step: CharStep): string {
+  return getAvatarSpritePath(level, dir, step);
 }
 
 export function getOniSpriteSrc(_dir: CharDirection, _step: CharStep): string {

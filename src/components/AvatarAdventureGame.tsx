@@ -3,8 +3,9 @@ import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
 import { prefectures, type Prefecture } from '../data/prefectures';
 import { usePlayer } from '../context/PlayerContext';
+import { BOSS_IMAGE, type AvatarLevel } from '../data/characterAssets';
 import { resolveAvatarLevel } from '../data/progress';
-import { BOSS_IMAGE } from '../data/characterAssets';
+import { AdventureAvatarSelect } from './AdventureAvatarSelect';
 import {
   buildPrefectureCapitalPositions,
   buildWorldSize,
@@ -17,6 +18,7 @@ import {
 } from '../utils/mapPositions';
 import {
   directionFromVector,
+  getAvatarFallbackSrc,
   getAvatarSpriteSrc,
   getOniSpriteSrc,
   type CharDirection,
@@ -31,7 +33,7 @@ interface AvatarAdventureGameProps {
   onBack: () => void;
 }
 
-type Phase = 'intro' | 'play' | 'win' | 'lose';
+type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 
 const ONI_SPEED = 3.75;
 const ONI_DELAY_MS = 3000;
@@ -74,9 +76,10 @@ function stepFromMotion(moving: boolean, frame: number): CharStep {
 
 export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const { activePlayer } = usePlayer();
-  const avatarLevel = activePlayer ? resolveAvatarLevel(activePlayer.progress) : 1;
+  const defaultAvatar = activePlayer ? resolveAvatarLevel(activePlayer.progress) : 1;
 
-  const [phase, setPhase] = useState<Phase>('intro');
+  const [phase, setPhase] = useState<Phase>('pick-avatar');
+  const [chosenAvatar, setChosenAvatar] = useState<AvatarLevel>(defaultAvatar);
   const [pendingStart, setPendingStart] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const { width: viewW, height: viewH } = useMapSize(viewportRef);
@@ -101,7 +104,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const oniActiveRef = useRef(false);
   const oniChasePausedRef = useRef(false);
   const goalPosRef = useRef<MapPoint>({ x: 0, y: 0 });
-  const phaseRef = useRef<Phase>('intro');
+  const phaseRef = useRef<Phase>('pick-avatar');
   const lastDirRef = useRef<CharDirection>('down');
   const worldSizeRef = useRef(worldSize);
   const viewSizeRef = useRef({ width: viewW, height: viewH });
@@ -289,6 +292,24 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     ? directionFromVector(playerPos.x - oniPos.x, playerPos.y - oniPos.y)
     : 'left';
 
+  if (phase === 'pick-avatar') {
+    if (!activePlayer) {
+      onBack();
+      return null;
+    }
+    return (
+      <AdventureAvatarSelect
+        progress={activePlayer.progress}
+        onBack={onBack}
+        onConfirm={(level) => {
+          setChosenAvatar(level);
+          setPhase('intro');
+          phaseRef.current = 'intro';
+        }}
+      />
+    );
+  }
+
   if (phase === 'intro') {
     return (
       <div className="game-screen adventure-screen">
@@ -411,7 +432,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       x={playerPos.x}
                       y={playerPos.y}
                       size={CHAR_SIZE}
-                      imageSrc={getAvatarSpriteSrc(avatarLevel, playerDir, playerStep)}
+                      imageSrc={getAvatarSpriteSrc(chosenAvatar, playerDir, playerStep)}
+                      fallbackSrc={getAvatarFallbackSrc(chosenAvatar)}
                       direction={playerDir}
                       step={playerStep}
                       className="map-char--player"

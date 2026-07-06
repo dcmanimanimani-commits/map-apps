@@ -2548,6 +2548,93 @@ html.boss-no-select .scribble-kanji-input {
   gap: 0.35rem;
 }
 
+.adventure-avatar-select-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.adventure-avatar-select-lead {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1e3a5f;
+  text-align: center;
+  margin: 0 0 0.35rem;
+}
+
+.adventure-avatar-select-hint {
+  font-size: 0.82rem;
+  color: #64748b;
+  text-align: center;
+  margin: 0 0 1rem;
+}
+
+.adventure-avatar-select-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.adventure-avatar-select-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 0.35rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.adventure-avatar-select-item:hover {
+  border-color: #6366f1;
+  transform: translateY(-2px);
+}
+
+.adventure-avatar-select-item--selected {
+  border-color: #6366f1;
+  background: #eef2ff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.adventure-avatar-select-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #334155;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.adventure-avatar-select-check {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #6366f1;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adventure-avatar-select-confirm {
+  margin-top: auto;
+  width: 100%;
+}
+
 .adventure-intro-card {
   background: white;
   border-radius: 16px;

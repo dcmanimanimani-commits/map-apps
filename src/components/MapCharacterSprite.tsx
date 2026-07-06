@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { CharDirection, CharStep } from '../utils/characterSprites';
 
 interface MapCharacterSpriteProps {
@@ -5,6 +6,7 @@ interface MapCharacterSpriteProps {
   y: number;
   size: number;
   imageSrc: string;
+  fallbackSrc?: string;
   direction: CharDirection;
   step: CharStep;
   className?: string;
@@ -18,6 +20,7 @@ export function MapCharacterSprite({
   y,
   size,
   imageSrc,
+  fallbackSrc,
   direction,
   step,
   className = '',
@@ -26,6 +29,11 @@ export function MapCharacterSprite({
   onPointerDown,
 }: MapCharacterSpriteProps) {
   const moving = step !== 'idle';
+  const [resolvedSrc, setResolvedSrc] = useState(imageSrc);
+
+  useEffect(() => {
+    setResolvedSrc(imageSrc);
+  }, [imageSrc]);
 
   return (
     <div
@@ -42,7 +50,17 @@ export function MapCharacterSprite({
       title={label}
       onPointerDown={interactive ? onPointerDown : undefined}
     >
-      <img src={imageSrc} alt="" className="map-char-img" draggable={false} />
+      <img
+        src={resolvedSrc}
+        alt=""
+        className="map-char-img"
+        draggable={false}
+        onError={() => {
+          if (fallbackSrc && resolvedSrc !== fallbackSrc) {
+            setResolvedSrc(fallbackSrc);
+          }
+        }}
+      />
     </div>
   );
 }
