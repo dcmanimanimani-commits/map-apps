@@ -121,6 +121,11 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const capitalsRef = useRef(capitals);
   capitalsRef.current = capitals;
 
+  const capitalMarkerSize = useMemo(() => {
+    if (viewW < 200) return 26;
+    return Math.round(Math.max(24, Math.min(42, viewW * 0.058)));
+  }, [viewW]);
+
   const camera = useMemo(
     () => getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height),
     [playerPos, viewW, viewH, worldSize.width, worldSize.height],
@@ -396,7 +401,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       <div
                         key={kanji}
                         className="adventure-capital-marker"
-                        style={{ left: pos.x, top: pos.y }}
+                        style={{ left: pos.x, top: pos.y, fontSize: capitalMarkerSize }}
                         aria-hidden
                       >
                         ◎
