@@ -11,7 +11,7 @@ export const AVATAR_SPRITE_FRAMES: AvatarSpriteFrame[] = ['idle', 'walk1', 'walk
 
 const SPRITE_ROOT = '/characters/sprites';
 
-export function charStepToSpriteFrame(step: CharStep): AvatarSpriteFrame {
+export function charStepToSpriteFrame(_level: AvatarLevel, step: CharStep): AvatarSpriteFrame {
   if (step === 'idle') return 'idle';
   if (step === 'rightFoot') return 'walk1';
   return 'walk2';
@@ -23,7 +23,7 @@ export function getAvatarSpritePath(
   dir: CharDirection,
   step: CharStep,
 ): string {
-  const frame = charStepToSpriteFrame(step);
+  const frame = charStepToSpriteFrame(level, step);
   return `${SPRITE_ROOT}/avatar-${level}/${dir}-${frame}.webp`;
 }
 
