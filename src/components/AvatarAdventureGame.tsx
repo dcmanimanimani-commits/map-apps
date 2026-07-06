@@ -43,6 +43,8 @@ const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 76;
 const ONI_SIZE = 92;
+/** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
+const PLAYER_FOLLOW_RATE = 0.34;
 
 const START_EXCLUDED_KANJI = new Set(['北海道', '沖縄県']);
 const START_REGIONS = new Set(['東北', '関東', '中部', '近畿', '中国', '四国', '九州']);
@@ -179,10 +181,12 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
     const touch = clientToWorld(ptr.clientX, ptr.clientY, rect, cam);
     const before = playerPosRef.current;
+    const targetX = touch.x - ptr.grabOffsetX;
+    const targetY = touch.y - ptr.grabOffsetY;
     const nextPlayer = clampToMap(
       {
-        x: touch.x - ptr.grabOffsetX,
-        y: touch.y - ptr.grabOffsetY,
+        x: before.x + (targetX - before.x) * PLAYER_FOLLOW_RATE,
+        y: before.y + (targetY - before.y) * PLAYER_FOLLOW_RATE,
       },
       ww,
       wh,
@@ -240,16 +244,14 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       grabOffsetY: touch.y - playerPosRef.current.y,
     };
     viewportRef.current?.setPointerCapture(e.pointerId);
-    applyPointerToPlayer();
-  }, [worldPointFromClient, applyPointerToPlayer]);
+  }, [worldPointFromClient]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!pointerRef.current.active) return;
     e.preventDefault();
     pointerRef.current.clientX = e.clientX;
     pointerRef.current.clientY = e.clientY;
-    applyPointerToPlayer();
-  }, [applyPointerToPlayer]);
+  }, []);
 
   const handlePointerEnd = useCallback((e: React.PointerEvent) => {
     if (!pointerRef.current.active) return;

@@ -20,7 +20,7 @@ export interface MapPoint {
 }
 
 /** たんけんモードのズーム（1=初期。大きいほどワールド拡大＝画面上の地図が大きく見える） */
-const ADVENTURE_ZOOM = 1.5 * 2;
+const ADVENTURE_ZOOM = 1.5 * 2 * 0.8;
 export const ADVENTURE_WORLD_SCALE_W = 6.5 * ADVENTURE_ZOOM;
 export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
 
