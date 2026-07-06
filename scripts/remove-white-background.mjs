@@ -1,5 +1,5 @@
 /**
- * キャラ画像の白背景を透過に変換（エッジからのフラッドフィル）
+ * キャラ画像の背景を透過に変換（四隅の色を基準にエッジからフラッドフィル）
  * 使い方: node scripts/remove-white-background.mjs
  */
 import { execSync } from 'node:child_process';
@@ -11,18 +11,52 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const CHAR_DIR = path.join(ROOT, 'public', 'characters');
 const SPRITE_DIR = path.join(CHAR_DIR, 'sprites');
 
-const WHITE_THRESHOLD = 238;
-const EDGE_SOFTNESS = 28;
+/** 背景色との距離がこの値以下なら背景とみなす */
+const BG_TOLERANCE = 52;
+/** 輪郭のアンチエイリアスをなじませる幅 */
+const EDGE_SOFTNESS = 36;
 
-function isNearWhite(r, g, b, threshold = WHITE_THRESHOLD) {
-  return r >= threshold && g >= threshold && b >= threshold;
+function colorDist(r, g, b, br, bg, bb) {
+  const dr = r - br;
+  const dg = g - bg;
+  const db = b - bb;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
-function whiteScore(r, g, b) {
-  return (r + g + b) / 3;
+function median(values) {
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+function sampleBackgroundColor(data, width, height) {
+  const rs = [];
+  const gs = [];
+  const bs = [];
+  const points = [
+    [0, 0],
+    [width - 1, 0],
+    [0, height - 1],
+    [width - 1, height - 1],
+    [(width / 2) | 0, 0],
+    [0, (height / 2) | 0],
+    [width - 1, (height / 2) | 0],
+    [(width / 2) | 0, height - 1],
+  ];
+  for (const [x, y] of points) {
+    const pi = (y * width + x) * 4;
+    rs.push(data[pi]);
+    gs.push(data[pi + 1]);
+    bs.push(data[pi + 2]);
+  }
+  return [median(rs), median(gs), median(bs)];
+}
+
+function isNearBackground(r, g, b, bg, tolerance = BG_TOLERANCE) {
+  return colorDist(r, g, b, bg[0], bg[1], bg[2]) <= tolerance;
 }
 
 function floodFillBackground(data, width, height) {
+  const bg = sampleBackgroundColor(data, width, height);
   const visited = new Uint8Array(width * height);
   const queue = [];
 
@@ -46,7 +80,7 @@ function floodFillBackground(data, width, height) {
     const g = data[pi + 1];
     const b = data[pi + 2];
 
-    if (!isNearWhite(r, g, b)) continue;
+    if (!isNearBackground(r, g, b, bg)) continue;
 
     visited[idx] = 1;
     data[pi + 3] = 0;
@@ -63,14 +97,16 @@ function floodFillBackground(data, width, height) {
       const r = data[pi];
       const g = data[pi + 1];
       const b = data[pi + 2];
-      const score = whiteScore(r, g, b);
+      const dist = colorDist(r, g, b, bg[0], bg[1], bg[2]);
 
-      if (score >= WHITE_THRESHOLD - EDGE_SOFTNESS) {
-        const fade = (score - (WHITE_THRESHOLD - EDGE_SOFTNESS)) / EDGE_SOFTNESS;
-        data[pi + 3] = Math.round(data[pi + 3] * (1 - Math.min(1, fade)));
+      if (dist <= BG_TOLERANCE + EDGE_SOFTNESS) {
+        const fade = (BG_TOLERANCE + EDGE_SOFTNESS - dist) / EDGE_SOFTNESS;
+        data[pi + 3] = Math.round(data[pi + 3] * (1 - Math.min(1, Math.max(0, fade))));
       }
     }
   }
+
+  return bg;
 }
 
 async function collectWebpFiles(dir) {
@@ -97,7 +133,7 @@ async function collectWebpFiles(dir) {
 async function processFile(filePath) {
   const img = sharp(filePath);
   const { data, info } = await img.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  floodFillBackground(data, info.width, info.height);
+  const bg = floodFillBackground(data, info.width, info.height);
 
   const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
     .webp({ quality: 92, alphaQuality: 100, effort: 4 })
@@ -107,7 +143,9 @@ async function processFile(filePath) {
   const staged = path.join(CHAR_DIR, '_processed', rel);
   await mkdir(path.dirname(staged), { recursive: true });
   await writeFile(staged, out);
-  console.log(`  staged ${path.relative(ROOT, staged)} (${info.width}x${info.height})`);
+  console.log(
+    `  staged ${path.relative(ROOT, staged)} (${info.width}x${info.height}, bg rgb(${bg.join(',')}))`,
+  );
 }
 
 function syncStagedFiles(files) {
@@ -126,7 +164,7 @@ function syncStagedFiles(files) {
         execSync(`cp -f '${from}' '${to}'`, { stdio: 'pipe' });
       }
       console.log(`OK ${path.relative(ROOT, filePath)}`);
-    } catch (err) {
+    } catch {
       console.warn(`WARN could not overwrite ${path.relative(ROOT, filePath)} (use staged copy)`);
     }
   }
