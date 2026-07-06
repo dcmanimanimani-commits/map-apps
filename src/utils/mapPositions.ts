@@ -19,10 +19,10 @@ export interface MapPoint {
   y: number;
 }
 
-/** たんけんモード：ビューポートに対するワールド倍率（大きいほど引きの地図） */
+/** たんけんモードのズーム（1=初期。大きいほどワールド拡大＝画面上の地図が大きく見える） */
 const ADVENTURE_ZOOM = 1.5 * 2;
-export const ADVENTURE_WORLD_SCALE_W = 6.5 / ADVENTURE_ZOOM;
-export const ADVENTURE_WORLD_SCALE_H = 5.5 / ADVENTURE_ZOOM;
+export const ADVENTURE_WORLD_SCALE_W = 6.5 * ADVENTURE_ZOOM;
+export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
 
 /** 画面に約1地方が入るようワールドを拡大 */
 export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
