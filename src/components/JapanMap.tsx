@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
@@ -31,6 +31,7 @@ interface JapanMapProps {
   showPrefectureLabels?: boolean;
   onPrefectureClick?: (kanji: string) => void;
   interactive?: boolean;
+  renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
 export function JapanMap({
@@ -43,6 +44,7 @@ export function JapanMap({
   showPrefectureLabels = false,
   onPrefectureClick,
   interactive = true,
+  renderOverlay,
 }: JapanMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { width, height } = useMapSize(containerRef);
@@ -300,6 +302,7 @@ export function JapanMap({
           </g>
         )}
       </svg>
+      {renderOverlay?.({ width, height })}
     </div>
   );
 }

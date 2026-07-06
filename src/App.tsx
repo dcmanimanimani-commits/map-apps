@@ -4,6 +4,7 @@ import { WhereGame } from './components/WhereGame';
 import { LandmarkGame } from './components/LandmarkGame';
 import { KanjiWriteGame } from './components/KanjiWriteGame';
 import { ExploreMode } from './components/ExploreMode';
+import { AvatarAdventureGame } from './components/AvatarAdventureGame';
 import { RegionSelect } from './components/RegionSelect';
 import { RegionStudy } from './components/RegionStudy';
 import { PlayerStatus } from './components/PlayerStatus';
@@ -18,12 +19,14 @@ type Screen =
   | 'where'
   | 'landmark'
   | 'kanji'
-  | 'explore';
+  | 'explore'
+  | 'adventure';
 
 const quizModes = [
   { id: 'where' as const, emoji: '🗾', title: 'どこかな？', desc: '漢字の県名を読んで、地図で場所をタップ！', color: '#4F9CF9' },
   { id: 'landmark' as const, emoji: '🍜', title: '名物クイズ', desc: '名物・名所から都道府県を当てよう！', color: '#FF6B6B' },
   { id: 'kanji' as const, emoji: '✏️', title: '漢字チャレンジ', desc: '指やペンで漢字を書いて覚えよう！', color: '#9B5DE5' },
+  { id: 'adventure' as const, emoji: '🚶', title: 'アバターたんけん', desc: '地図を歩いて目的地へ！鬼に気をつけて', color: '#F59E0B' },
   { id: 'explore' as const, emoji: '🔍', title: '地図でべんきょう', desc: '地図を自由にタップして確認', color: '#06D6A0' },
 ];
 
@@ -94,6 +97,7 @@ function AppContent() {
   if (screen === 'landmark') return <LandmarkGame geo={geo} onBack={() => setScreen('home')} />;
   if (screen === 'kanji') return <KanjiWriteGame onBack={() => setScreen('home')} />;
   if (screen === 'explore') return <ExploreMode geo={geo} onBack={() => setScreen('home')} />;
+  if (screen === 'adventure') return <AvatarAdventureGame geo={geo} onBack={() => setScreen('home')} />;
 
   return (
     <div className="app home compact-home">
