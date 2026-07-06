@@ -28,7 +28,7 @@ export function getRegionColor(region: string): string {
 
 export function getShortKanji(kanji: string): string {
   if (kanji === '北海道') return '北海道';
-  return kanji.replace(/[都道府県]/g, '');
+  return kanji.replace(/(都|道|府|県)$/, '');
 }
 
 /** 地図ラベル用の短いひらがな */

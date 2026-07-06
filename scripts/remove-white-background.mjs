@@ -11,10 +11,13 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const CHAR_DIR = path.join(ROOT, 'public', 'characters');
 const SPRITE_DIR = path.join(CHAR_DIR, 'sprites');
 
-/** 背景色との距離がこの値以下なら背景とみなす */
-const BG_TOLERANCE = 52;
-/** 輪郭のアンチエイリアスをなじませる幅 */
-const EDGE_SOFTNESS = 36;
+const AVATAR_BG_TOLERANCE = 58;
+const AVATAR_EDGE_SOFTNESS = 42;
+
+const BOSS_BG_TOLERANCE = 34;
+const BOSS_EDGE_SOFTNESS = 22;
+/** 鬼大王のみ切り出す領域（百鬼夜行の旗などを除外） */
+const BOSS_ONI_CROP = { left: 0.38, top: 0.16, width: 0.24, height: 0.84 };
 
 function colorDist(r, g, b, br, bg, bb) {
   const dr = r - br;
@@ -51,11 +54,11 @@ function sampleBackgroundColor(data, width, height) {
   return [median(rs), median(gs), median(bs)];
 }
 
-function isNearBackground(r, g, b, bg, tolerance = BG_TOLERANCE) {
+function isNearBackground(r, g, b, bg, tolerance) {
   return colorDist(r, g, b, bg[0], bg[1], bg[2]) <= tolerance;
 }
 
-function floodFillBackground(data, width, height) {
+function floodFillBackground(data, width, height, tolerance, edgeSoftness) {
   const bg = sampleBackgroundColor(data, width, height);
   const visited = new Uint8Array(width * height);
   const queue = [];
@@ -80,7 +83,7 @@ function floodFillBackground(data, width, height) {
     const g = data[pi + 1];
     const b = data[pi + 2];
 
-    if (!isNearBackground(r, g, b, bg)) continue;
+    if (!isNearBackground(r, g, b, bg, tolerance)) continue;
 
     visited[idx] = 1;
     data[pi + 3] = 0;
@@ -99,8 +102,8 @@ function floodFillBackground(data, width, height) {
       const b = data[pi + 2];
       const dist = colorDist(r, g, b, bg[0], bg[1], bg[2]);
 
-      if (dist <= BG_TOLERANCE + EDGE_SOFTNESS) {
-        const fade = (BG_TOLERANCE + EDGE_SOFTNESS - dist) / EDGE_SOFTNESS;
+      if (dist <= tolerance + edgeSoftness) {
+        const fade = (tolerance + edgeSoftness - dist) / edgeSoftness;
         data[pi + 3] = Math.round(data[pi + 3] * (1 - Math.min(1, Math.max(0, fade))));
       }
     }
@@ -123,17 +126,43 @@ async function collectWebpFiles(dir) {
     if (entry.isDirectory()) {
       if (entry.name.startsWith('_')) continue;
       files.push(...(await collectWebpFiles(full)));
-    } else if (entry.name.endsWith('.webp')) {
+    } else if (entry.name.endsWith('.webp') && !entry.name.startsWith('_') && !entry.name.includes('-original')) {
       files.push(full);
     }
   }
   return files;
 }
 
+function isBossImage(filePath) {
+  return path.basename(filePath) === 'boss-daiou.webp';
+}
+
+async function loadBossOniCrop(filePath) {
+  const meta = await sharp(filePath).metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  const left = Math.max(0, Math.floor(width * BOSS_ONI_CROP.left));
+  const top = Math.max(0, Math.floor(height * BOSS_ONI_CROP.top));
+  const extractWidth = Math.min(width - left, Math.floor(width * BOSS_ONI_CROP.width));
+  const extractHeight = Math.min(height - top, Math.floor(height * BOSS_ONI_CROP.height));
+
+  return sharp(filePath)
+    .extract({ left, top, width: extractWidth, height: extractHeight })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+}
+
 async function processFile(filePath) {
-  const img = sharp(filePath);
-  const { data, info } = await img.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const bg = floodFillBackground(data, info.width, info.height);
+  const boss = isBossImage(filePath);
+  const tolerance = boss ? BOSS_BG_TOLERANCE : AVATAR_BG_TOLERANCE;
+  const edgeSoftness = boss ? BOSS_EDGE_SOFTNESS : AVATAR_EDGE_SOFTNESS;
+
+  const { data, info } = boss
+    ? await loadBossOniCrop(filePath)
+    : await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+
+  const bg = floodFillBackground(data, info.width, info.height, tolerance, edgeSoftness);
 
   const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
     .webp({ quality: 92, alphaQuality: 100, effort: 4 })
@@ -143,8 +172,9 @@ async function processFile(filePath) {
   const staged = path.join(CHAR_DIR, '_processed', rel);
   await mkdir(path.dirname(staged), { recursive: true });
   await writeFile(staged, out);
+  const note = boss ? `, cropped oni ${info.width}x${info.height}` : '';
   console.log(
-    `  staged ${path.relative(ROOT, staged)} (${info.width}x${info.height}, bg rgb(${bg.join(',')}))`,
+    `  staged ${path.relative(ROOT, staged)} (${info.width}x${info.height}, bg rgb(${bg.join(',')})${note})`,
   );
 }
 
