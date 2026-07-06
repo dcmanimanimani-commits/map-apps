@@ -204,6 +204,92 @@ export function findNearestPrefectureByCapital(
   return bestKanji;
 }
 
+function isOutsideViewport(
+  pos: MapPoint,
+  camera: MapPoint,
+  viewW: number,
+  viewH: number,
+  margin = 0,
+): boolean {
+  return (
+    pos.x < camera.x - margin ||
+    pos.x > camera.x + viewW + margin ||
+    pos.y < camera.y - margin ||
+    pos.y > camera.y + viewH + margin
+  );
+}
+
+function isNearViewportEdgeBand(
+  pos: MapPoint,
+  camera: MapPoint,
+  viewW: number,
+  viewH: number,
+  bandRatio: number,
+): boolean {
+  const relX = pos.x - camera.x;
+  const relY = pos.y - camera.y;
+  if (relX < 0 || relX > viewW || relY < 0 || relY > viewH) return false;
+  const bandX = viewW * bandRatio;
+  const bandY = viewH * bandRatio;
+  return relX < bandX || relX > viewW - bandX || relY < bandY || relY > viewH - bandY;
+}
+
+/**
+ * 画面外または画面端付近の、プレイヤーと別県の県庁所在地から鬼を出現させる。
+ */
+export function pickOniSpawnAtEdgeCapital(
+  player: MapPoint,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  viewW: number,
+  viewH: number,
+  capitals: Map<string, MapPoint>,
+): MapPoint {
+  const camera = getCamera(player, viewW, viewH, worldW, worldH);
+  const playerPref =
+    findPrefectureAtPoint(player, geo, worldW, worldH) ??
+    findNearestPrefectureByCapital(player, capitals);
+
+  const minDist = Math.min(viewW, viewH) * 0.5;
+  const edgeBand = 0.14;
+  const outsideCandidates: { pos: MapPoint; dist: number }[] = [];
+  const bandCandidates: { pos: MapPoint; dist: number }[] = [];
+
+  for (const [kanji, pos] of capitals) {
+    if (kanji === playerPref) continue;
+    const dist = mapDistance(player, pos);
+    if (dist < minDist) continue;
+
+    if (isOutsideViewport(pos, camera, viewW, viewH)) {
+      outsideCandidates.push({ pos, dist });
+    } else if (isNearViewportEdgeBand(pos, camera, viewW, viewH, edgeBand)) {
+      bandCandidates.push({ pos, dist });
+    }
+  }
+
+  const pool = outsideCandidates.length > 0 ? outsideCandidates : bandCandidates;
+
+  if (pool.length > 0) {
+    pool.sort((a, b) => b.dist - a.dist);
+    const top = pool.slice(0, Math.min(6, pool.length));
+    return top[Math.floor(Math.random() * top.length)].pos;
+  }
+
+  let fallback: MapPoint | null = null;
+  let fallbackDist = -1;
+  for (const [kanji, pos] of capitals) {
+    if (kanji === playerPref) continue;
+    const dist = mapDistance(player, pos);
+    if (dist > fallbackDist) {
+      fallbackDist = dist;
+      fallback = pos;
+    }
+  }
+
+  return fallback ?? capitals.values().next().value ?? player;
+}
+
 export function mapDistance(a: MapPoint, b: MapPoint): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }

@@ -9,11 +9,10 @@ import {
   buildPrefectureCapitalPositions,
   buildWorldSize,
   clampToMap,
-  findNearestPrefectureByCapital,
-  findPrefectureAtPoint,
   getCamera,
   mapDistance,
   moveToward,
+  pickOniSpawnAtEdgeCapital,
   type MapPoint,
 } from '../utils/mapPositions';
 import {
@@ -68,22 +67,6 @@ function pickStartAndGoal(capitals: Map<string, MapPoint>): {
   };
 }
 
-function pickOniSpawn(
-  player: MapPoint,
-  geo: JapanGeoJSON,
-  worldW: number,
-  worldH: number,
-  capitals: Map<string, MapPoint>,
-): MapPoint {
-  const prefecture =
-    findPrefectureAtPoint(player, geo, worldW, worldH) ??
-    findNearestPrefectureByCapital(player, capitals);
-  if (prefecture && capitals.has(prefecture)) {
-    return capitals.get(prefecture)!;
-  }
-  return capitals.values().next().value ?? player;
-}
-
 function stepFromMotion(moving: boolean, frame: number): CharStep {
   if (!moving) return 'idle';
   return frame % 2 === 0 ? 'rightFoot' : 'leftFoot';
@@ -121,12 +104,14 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const phaseRef = useRef<Phase>('intro');
   const lastDirRef = useRef<CharDirection>('down');
   const worldSizeRef = useRef(worldSize);
+  const viewSizeRef = useRef({ width: viewW, height: viewH });
 
   playerPosRef.current = playerPos;
   oniPosRef.current = oniPos;
   oniActiveRef.current = oniActive;
   phaseRef.current = phase;
   worldSizeRef.current = worldSize;
+  viewSizeRef.current = { width: viewW, height: viewH };
 
   const capitals = useMemo(() => {
     if (worldSize.width < 200) return new Map<string, MapPoint>();
@@ -225,7 +210,16 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
     const oniTimer = window.setTimeout(() => {
       const { width: ww, height: wh } = worldSizeRef.current;
-      const spawn = pickOniSpawn(playerPosRef.current, geo, ww, wh, capitalsRef.current);
+      const { width: vw, height: vh } = viewSizeRef.current;
+      const spawn = pickOniSpawnAtEdgeCapital(
+        playerPosRef.current,
+        geo,
+        ww,
+        wh,
+        vw,
+        vh,
+        capitalsRef.current,
+      );
       setOniPos(spawn);
       oniPosRef.current = spawn;
       setOniActive(true);
@@ -305,7 +299,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <li>🚩 スタートは本州・四国・九州の県庁所在地</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
-            <li>👹 3秒後、<strong>いまいる県</strong>の県庁所在地から鬼が現れる！</li>
+            <li>👹 3秒後、<strong>画面の端</strong>の別の県の県庁所在地から鬼が現れる！</li>
           </ul>
           <button type="button" className="btn-primary" onClick={requestStart}>たんけんスタート！</button>
         </div>
