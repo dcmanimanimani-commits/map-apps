@@ -16,6 +16,39 @@ export interface MapPoint {
   y: number;
 }
 
+/** 画面に約1地方が入るようワールドを拡大 */
+export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
+  return {
+    width: Math.round(viewportW * 6.5),
+    height: Math.round(viewportH * 5.5),
+  };
+}
+
+export function getCamera(
+  player: MapPoint,
+  viewportW: number,
+  viewportH: number,
+  worldW: number,
+  worldH: number,
+): MapPoint {
+  return {
+    x: Math.max(0, Math.min(worldW - viewportW, player.x - viewportW / 2)),
+    y: Math.max(0, Math.min(worldH - viewportH, player.y - viewportH / 2)),
+  };
+}
+
+export function clientToWorld(
+  clientX: number,
+  clientY: number,
+  rect: DOMRect,
+  camera: MapPoint,
+): MapPoint {
+  return {
+    x: clientX - rect.left + camera.x,
+    y: clientY - rect.top + camera.y,
+  };
+}
+
 /** 全県の地図上座標（重心）を構築 */
 export function buildPrefectureCentroids(
   geo: JapanGeoJSON,
@@ -53,6 +86,16 @@ export function buildPrefectureCentroids(
   }
 
   return positions;
+}
+
+/** 県の中の目的地（重心から少しずらした地点） */
+export function buildGoalSpotInPrefecture(centroid: MapPoint): MapPoint {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 28 + Math.random() * 42;
+  return {
+    x: centroid.x + Math.cos(angle) * dist,
+    y: centroid.y + Math.sin(angle) * dist,
+  };
 }
 
 export function mapDistance(a: MapPoint, b: MapPoint): number {

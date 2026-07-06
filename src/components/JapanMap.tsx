@@ -31,6 +31,8 @@ interface JapanMapProps {
   showPrefectureLabels?: boolean;
   onPrefectureClick?: (kanji: string) => void;
   interactive?: boolean;
+  /** ワールド座標用の固定サイズ（たんけんモードなど） */
+  fixedSize?: { width: number; height: number };
   renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
@@ -44,10 +46,13 @@ export function JapanMap({
   showPrefectureLabels = false,
   onPrefectureClick,
   interactive = true,
+  fixedSize,
   renderOverlay,
 }: JapanMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { width, height } = useMapSize(containerRef);
+  const measured = useMapSize(containerRef);
+  const width = fixedSize?.width ?? measured.width;
+  const height = fixedSize?.height ?? measured.height;
 
   const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
@@ -243,7 +248,11 @@ export function JapanMap({
   }
 
   return (
-    <div ref={containerRef} className={`japan-map-wrapper${isFocused ? ' region-focus' : ''}`}>
+    <div
+      ref={containerRef}
+      className={`japan-map-wrapper${isFocused ? ' region-focus' : ''}${fixedSize ? ' japan-map-wrapper--fixed' : ''}`}
+      style={fixedSize ? { width: fixedSize.width, height: fixedSize.height } : undefined}
+    >
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="japan-map"

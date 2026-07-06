@@ -2619,7 +2619,45 @@ html.boss-no-select .scribble-kanji-input {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+}
+
+.adventure-viewport {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+  cursor: crosshair;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.adventure-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.adventure-viewport .japan-map-wrapper--fixed {
+  min-height: 0;
+}
+
+.adventure-touch-hint {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: white;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .adventure-map {
