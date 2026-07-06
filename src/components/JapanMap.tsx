@@ -56,7 +56,9 @@ export function JapanMap({
 
   const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
-  const strokeWidth = Math.max(1.2, width * 0.0025);
+  const strokeWidth = fixedSize
+    ? Math.max(0.35, (width / 6.5) * 0.0016)
+    : Math.max(1, width * 0.002);
   const labelFontSize = Math.max(11, Math.min(15, width * 0.024));
   const insetLabelFontSize = Math.max(10, Math.min(13, width * 0.02));
 
@@ -297,7 +299,7 @@ export function JapanMap({
               d={`M ${okinawaInset.layout.cornerX} ${height} L ${okinawaInset.layout.cornerX} ${okinawaInset.layout.cornerY} L ${width} ${okinawaInset.layout.cornerY}`}
               fill="none"
               stroke="#ffffff"
-              strokeWidth={strokeWidth * 1.2}
+              strokeWidth={fixedSize ? strokeWidth : strokeWidth * 1.2}
               pointerEvents="none"
             />
 

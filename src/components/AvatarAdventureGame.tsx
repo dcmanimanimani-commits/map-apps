@@ -36,8 +36,8 @@ const ONI_SPEED = 3.75;
 const ONI_DELAY_MS = 3000;
 const ARRIVE_RADIUS = 36;
 const CATCH_RADIUS = 34;
-const CHAR_SIZE = 48;
-const ONI_SIZE = 56;
+const CHAR_SIZE = 76;
+const ONI_SIZE = 92;
 
 function pickStartAndGoal(centroids: Map<string, MapPoint>): {
   start: Prefecture;
