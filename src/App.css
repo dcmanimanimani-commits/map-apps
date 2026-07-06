@@ -2548,56 +2548,6 @@ html.boss-no-select .scribble-kanji-input {
   gap: 0.35rem;
 }
 
-.adventure-top-bar {
-  flex-shrink: 0;
-  display: flex;
-  gap: 0.45rem;
-  align-items: stretch;
-  min-height: 0;
-}
-
-.adventure-top-bar .player-status {
-  flex: 0 1 42%;
-  min-width: 0;
-  margin: 0;
-  padding: 0.5rem 0.6rem;
-}
-
-.adventure-top-bar .xp-text {
-  display: none;
-}
-
-.adventure-top-bar .player-name {
-  font-size: 0.78rem;
-}
-
-.adventure-top-bar .player-title {
-  font-size: 0.68rem;
-  line-height: 1.25;
-}
-
-.adventure-top-bar .adventure-goal-banner {
-  flex: 1 1 58%;
-  min-width: 0;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.adventure-top-bar .adventure-goal-kanji {
-  font-size: clamp(1.05rem, 4.2vw, 1.45rem);
-}
-
-.adventure-top-bar .adventure-goal-tail {
-  font-size: clamp(0.72rem, 2.8vw, 0.88rem);
-}
-
-.adventure-top-bar .adventure-goal-hiragana {
-  font-size: 0.72rem;
-  margin-top: 0.15rem;
-}
-
 .adventure-avatar-select-card {
   background: white;
   border-radius: 16px;
@@ -2725,7 +2675,7 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .adventure-goal-banner {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 12px;
@@ -2793,18 +2743,6 @@ html.boss-no-select .scribble-kanji-input {
   animation: adventure-blink 0.6s ease-in-out infinite alternate;
 }
 
-.adventure-warning--map {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 6;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  pointer-events: none;
-}
-
 @keyframes adventure-blink {
   from { opacity: 1; }
   to { opacity: 0.55; }
@@ -2815,17 +2753,14 @@ html.boss-no-select .scribble-kanji-input {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
 
 .adventure-viewport {
   flex: 1;
-  width: 100%;
   min-height: 0;
   margin-bottom: 0;
   overflow: hidden;
   position: relative;
-  display: block;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -2990,6 +2925,8 @@ html.boss-no-select .scribble-kanji-input {
 
 .map-char--player .map-char-img {
   transform: none;
+  /* 画像の見た目重心が左寄りのため、地図ビュー中央に合わせる（座標は変えない） */
+  object-position: 53% center;
 }
 
 .map-char--player.map-char--moving.map-char--rightFoot .map-char-img {
