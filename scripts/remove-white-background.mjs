@@ -14,11 +14,6 @@ const SPRITE_DIR = path.join(CHAR_DIR, 'sprites');
 const AVATAR_BG_TOLERANCE = 58;
 const AVATAR_EDGE_SOFTNESS = 42;
 
-const BOSS_BG_TOLERANCE = 34;
-const BOSS_EDGE_SOFTNESS = 22;
-/** 鬼大王のみ切り出す領域（百鬼夜行の旗などを除外） */
-const BOSS_ONI_CROP = { left: 0.38, top: 0.16, width: 0.24, height: 0.84 };
-
 function colorDist(r, g, b, br, bg, bb) {
   const dr = r - br;
   const dg = g - bg;
@@ -137,32 +132,14 @@ function isBossImage(filePath) {
   return path.basename(filePath) === 'boss-daiou.webp';
 }
 
-async function loadBossOniCrop(filePath) {
-  const meta = await sharp(filePath).metadata();
-  const width = meta.width ?? 0;
-  const height = meta.height ?? 0;
-  const left = Math.max(0, Math.floor(width * BOSS_ONI_CROP.left));
-  const top = Math.max(0, Math.floor(height * BOSS_ONI_CROP.top));
-  const extractWidth = Math.min(width - left, Math.floor(width * BOSS_ONI_CROP.width));
-  const extractHeight = Math.min(height - top, Math.floor(height * BOSS_ONI_CROP.height));
-
-  return sharp(filePath)
-    .extract({ left, top, width: extractWidth, height: extractHeight })
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-}
-
 async function processFile(filePath) {
-  const boss = isBossImage(filePath);
-  const tolerance = boss ? BOSS_BG_TOLERANCE : AVATAR_BG_TOLERANCE;
-  const edgeSoftness = boss ? BOSS_EDGE_SOFTNESS : AVATAR_EDGE_SOFTNESS;
+  if (isBossImage(filePath)) {
+    console.log(`  skip ${path.relative(ROOT, filePath)} (use original full artwork)`);
+    return;
+  }
 
-  const { data, info } = boss
-    ? await loadBossOniCrop(filePath)
-    : await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-
-  const bg = floodFillBackground(data, info.width, info.height, tolerance, edgeSoftness);
+  const { data, info } = await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const bg = floodFillBackground(data, info.width, info.height, AVATAR_BG_TOLERANCE, AVATAR_EDGE_SOFTNESS);
 
   const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
     .webp({ quality: 92, alphaQuality: 100, effort: 4 })
@@ -172,14 +149,14 @@ async function processFile(filePath) {
   const staged = path.join(CHAR_DIR, '_processed', rel);
   await mkdir(path.dirname(staged), { recursive: true });
   await writeFile(staged, out);
-  const note = boss ? `, cropped oni ${info.width}x${info.height}` : '';
   console.log(
-    `  staged ${path.relative(ROOT, staged)} (${info.width}x${info.height}, bg rgb(${bg.join(',')})${note})`,
+    `  staged ${path.relative(ROOT, staged)} (${info.width}x${info.height}, bg rgb(${bg.join(',')}))`,
   );
 }
 
 function syncStagedFiles(files) {
   for (const filePath of files) {
+    if (isBossImage(filePath)) continue;
     const rel = path.relative(CHAR_DIR, filePath);
     const staged = path.join(CHAR_DIR, '_processed', rel);
     const from = staged.replace(/'/g, "''");
