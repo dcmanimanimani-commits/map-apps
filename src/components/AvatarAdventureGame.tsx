@@ -4,8 +4,9 @@ import { useMapSize } from '../hooks/useMapSize';
 import { prefectures, type Prefecture } from '../data/prefectures';
 import { usePlayer } from '../context/PlayerContext';
 import { resolveAvatarLevel } from '../data/progress';
+import { BOSS_IMAGE } from '../data/characterAssets';
 import {
-  buildGoalSpotInPrefecture,
+  buildPrefectureCapitalPositions,
   buildPrefectureCentroids,
   buildWorldSize,
   clampToMap,
@@ -34,27 +35,30 @@ type Phase = 'intro' | 'play' | 'win' | 'lose';
 
 const ONI_SPEED = 3.75;
 const ONI_DELAY_MS = 3000;
-const ARRIVE_RADIUS = 36;
+const ONI_INTRO_MS = 1000;
+const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 76;
 const ONI_SIZE = 92;
 
-function pickStartAndGoal(centroids: Map<string, MapPoint>): {
+function pickStartAndGoal(
+  centroids: Map<string, MapPoint>,
+  capitals: Map<string, MapPoint>,
+): {
   start: Prefecture;
   goal: Prefecture;
   startPos: MapPoint;
   goalPos: MapPoint;
 } {
-  const available = prefectures.filter((p) => centroids.has(p.kanji));
+  const available = prefectures.filter((p) => centroids.has(p.kanji) && capitals.has(p.kanji));
   const goal = available[Math.floor(Math.random() * available.length)];
   const others = available.filter((p) => p.kanji !== goal.kanji);
   const start = others[Math.floor(Math.random() * others.length)];
-  const goalCentroid = centroids.get(goal.kanji)!;
   return {
     start,
     goal,
     startPos: centroids.get(start.kanji)!,
-    goalPos: buildGoalSpotInPrefecture(goalCentroid),
+    goalPos: capitals.get(goal.kanji)!,
   };
 }
 
@@ -91,10 +95,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
   const [startPref, setStartPref] = useState<Prefecture | null>(null);
   const [goalPref, setGoalPref] = useState<Prefecture | null>(null);
-  const [goalPos, setGoalPos] = useState<MapPoint | null>(null);
   const [playerPos, setPlayerPos] = useState<MapPoint>({ x: 350, y: 260 });
   const [oniPos, setOniPos] = useState<MapPoint | null>(null);
   const [oniActive, setOniActive] = useState(false);
+  const [oniIntro, setOniIntro] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [animFrame, setAnimFrame] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
@@ -103,6 +107,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const playerPosRef = useRef(playerPos);
   const oniPosRef = useRef<MapPoint | null>(null);
   const oniActiveRef = useRef(false);
+  const oniChasePausedRef = useRef(false);
   const goalPosRef = useRef<MapPoint>({ x: 0, y: 0 });
   const phaseRef = useRef<Phase>('intro');
   const lastDirRef = useRef<CharDirection>('down');
@@ -119,16 +124,20 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     return buildPrefectureCentroids(geo, worldSize.width, worldSize.height);
   }, [geo, worldSize.width, worldSize.height]);
 
+  const capitals = useMemo(() => {
+    if (worldSize.width < 200) return new Map<string, MapPoint>();
+    return buildPrefectureCapitalPositions(geo, worldSize.width, worldSize.height);
+  }, [geo, worldSize.width, worldSize.height]);
+
   const camera = useMemo(
     () => getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height),
     [playerPos, viewW, viewH, worldSize.width, worldSize.height],
   );
 
   const initRound = useCallback(() => {
-    const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(centroids);
+    const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(centroids, capitals);
     setStartPref(start);
     setGoalPref(goal);
-    setGoalPos(goalSpot);
     goalPosRef.current = goalSpot;
     setPlayerPos(startPos);
     playerPosRef.current = startPos;
@@ -136,11 +145,13 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     oniPosRef.current = null;
     setOniActive(false);
     oniActiveRef.current = false;
+    setOniIntro(false);
+    oniChasePausedRef.current = false;
     setCountdown(3);
     setAnimFrame(0);
     setIsMoving(false);
     pointerRef.current = { active: false, lastClientX: 0, lastClientY: 0 };
-  }, [centroids]);
+  }, [centroids, capitals]);
 
   const requestStart = useCallback(() => {
     setPhase('play');
@@ -148,10 +159,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, []);
 
   useEffect(() => {
-    if (!pendingStart || phase !== 'play' || worldSize.width < 200 || centroids.size === 0) return;
+    if (!pendingStart || phase !== 'play' || worldSize.width < 200 || centroids.size === 0 || capitals.size === 0) return;
     initRound();
     setPendingStart(false);
-  }, [pendingStart, phase, worldSize.width, centroids.size, initRound]);
+  }, [pendingStart, phase, worldSize.width, centroids.size, capitals.size, initRound]);
 
   const handlePlayerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'play') return;
@@ -203,12 +214,20 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   useEffect(() => {
     if (phase !== 'play' || worldSize.width < 200) return;
 
+    let introClearTimer: number | undefined;
+
     const oniTimer = window.setTimeout(() => {
       const spawn = pickOniSpawn(centroids, playerPosRef.current);
       setOniPos(spawn);
       oniPosRef.current = spawn;
       setOniActive(true);
       oniActiveRef.current = true;
+      setOniIntro(true);
+      oniChasePausedRef.current = true;
+      introClearTimer = window.setTimeout(() => {
+        setOniIntro(false);
+        oniChasePausedRef.current = false;
+      }, ONI_INTRO_MS);
     }, ONI_DELAY_MS);
 
     const countInterval = window.setInterval(() => {
@@ -223,7 +242,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
       const nextPlayer = playerPosRef.current;
 
-      if (oniActiveRef.current && oniPosRef.current) {
+      if (oniActiveRef.current && oniPosRef.current && !oniChasePausedRef.current) {
         const nextOni = moveToward(oniPosRef.current, nextPlayer, ONI_SPEED);
         oniPosRef.current = nextOni;
         setOniPos(nextOni);
@@ -250,6 +269,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
     return () => {
       clearTimeout(oniTimer);
+      if (introClearTimer !== undefined) clearTimeout(introClearTimer);
       clearInterval(countInterval);
       cancelAnimationFrame(raf);
     };
@@ -272,7 +292,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         <div className="adventure-intro-card">
           <p className="adventure-intro-lead">手に入れたアバターで日本地図を歩こう！</p>
           <ul className="adventure-intro-rules">
-            <li>🎯 県の中の<strong>目的地</strong>までたどり着け！</li>
+            <li>ひとつ選ばれた県の<strong>県庁所在地（◎）</strong>へたどり着け！</li>
+            <li>🗾 各県に◎マーク。見た目ではどれがゴールかわからない</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
             <li>👹 開始<strong>3秒後</strong>、もんだい大王が追いかけてくる！</li>
@@ -289,7 +310,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         <div className="clear-card">
           <span className="clear-emoji">🎉</span>
           <h2>到着！</h2>
-          <p>{goalPref?.kanji}の目的地にたどり着いた！</p>
+          <p>{goalPref?.kanji}の県庁所在地にたどり着いた！</p>
           <div className="finish-actions">
             <button className="btn-primary" onClick={requestStart}>もう一度</button>
             <button className="btn-secondary" onClick={onBack}>ホームへ</button>
@@ -326,12 +347,12 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
       <div className="adventure-hud">
         <p className="adventure-goal">
-          🎯 {goalPref?.landmarkEmoji} <strong>{goalPref?.kanji}</strong>のなかへ！
+          <strong>{goalPref?.kanji}</strong>の県庁所在地（◎）へ！
         </p>
         {!oniActive && countdown > 0 && (
           <p className="adventure-countdown">鬼まで {countdown}…</p>
         )}
-        {oniActive && <p className="adventure-warning">👹 にげろ！</p>}
+        {oniActive && !oniIntro && <p className="adventure-warning">👹 にげろ！</p>}
       </div>
 
       <div className="adventure-play-area">
@@ -354,22 +375,22 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
               <JapanMap
                 geo={geo}
                 fixedSize={worldSize}
-                highlightedKanji={goalPref?.kanji ?? null}
                 interactive={false}
                 renderOverlay={() => (
                   <div
                     className="adventure-overlay"
                     style={{ width: worldSize.width, height: worldSize.height }}
                   >
-                    {goalPos && (
+                    {Array.from(capitals.entries()).map(([kanji, pos]) => (
                       <div
-                        className="adventure-goal-marker"
-                        style={{ left: goalPos.x, top: goalPos.y }}
+                        key={kanji}
+                        className="adventure-capital-marker"
+                        style={{ left: pos.x, top: pos.y }}
                         aria-hidden
                       >
-                        🎯
+                        ◎
                       </div>
-                    )}
+                    ))}
                     <MapCharacterSprite
                       x={playerPos.x}
                       y={playerPos.y}
@@ -381,7 +402,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       interactive
                       onPointerDown={handlePlayerPointerDown}
                     />
-                    {oniActive && oniPos && (
+                    {oniActive && oniPos && !oniIntro && (
                       <MapCharacterSprite
                         x={oniPos.x}
                         y={oniPos.y}
@@ -398,6 +419,12 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             </div>
           )}
           <p className="adventure-touch-hint">👆 アバターをつかんでスライド</p>
+          {oniIntro && (
+            <div className="adventure-oni-splash" role="status" aria-live="assertive">
+              <img src={BOSS_IMAGE} alt="" className="adventure-oni-splash-img" />
+              <p className="adventure-oni-splash-text">鬼登場！逃げろ！</p>
+            </div>
+          )}
         </div>
       </div>
 

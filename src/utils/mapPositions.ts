@@ -1,6 +1,8 @@
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
+import { PREFECTURE_CAPITALS } from '../data/prefectureCapitals';
 import {
+  createMainlandProjection,
   createMainlandPathGenerator,
   createOkinawaInsetPathGenerator,
   createOkinawaFullPathGenerator,
@@ -88,14 +90,48 @@ export function buildPrefectureCentroids(
   return positions;
 }
 
-/** 県の中の目的地（重心から少しずらした地点） */
-export function buildGoalSpotInPrefecture(centroid: MapPoint): MapPoint {
-  const angle = Math.random() * Math.PI * 2;
-  const dist = 28 + Math.random() * 42;
-  return {
-    x: centroid.x + Math.cos(angle) * dist,
-    y: centroid.y + Math.sin(angle) * dist,
-  };
+/** 全県の県庁所在地を地図座標に変換 */
+export function buildPrefectureCapitalPositions(
+  geo: JapanGeoJSON,
+  width: number,
+  height: number,
+): Map<string, MapPoint> {
+  const positions = new Map<string, MapPoint>();
+  const { mainland, okinawa } = splitMainlandAndOkinawa(geo);
+  const mainlandProjection = createMainlandProjection(mainland, width, height);
+
+  for (const capital of PREFECTURE_CAPITALS) {
+    if (capital.kanji === OKINAWA_KANJI) continue;
+    const projected = mainlandProjection([capital.lon, capital.lat]);
+    if (projected) {
+      positions.set(capital.kanji, { x: projected[0], y: projected[1] });
+    }
+  }
+
+  if (okinawa) {
+    const okinawaCapital = PREFECTURE_CAPITALS.find((c) => c.kanji === OKINAWA_KANJI);
+    if (okinawaCapital) {
+      const layout = getOkinawaInsetLayout(width, height);
+      const insetPathGen = createOkinawaInsetPathGenerator(
+        okinawa,
+        layout,
+        width,
+        height,
+        OKINAWA_INSET_SCALE_FULL,
+      );
+      const insetProjection = insetPathGen.projection();
+      if (insetProjection && typeof insetProjection === 'function') {
+        const projected = (insetProjection as (coords: [number, number]) => [number, number] | null)(
+          [okinawaCapital.lon, okinawaCapital.lat],
+        );
+        if (projected) {
+          positions.set(OKINAWA_KANJI, { x: projected[0], y: projected[1] });
+        }
+      }
+    }
+  }
+
+  return positions;
 }
 
 export function mapDistance(a: MapPoint, b: MapPoint): number {
