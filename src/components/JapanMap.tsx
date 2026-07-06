@@ -5,6 +5,7 @@ import { useMapSize } from '../hooks/useMapSize';
 import { getRegionColor, getShortHiragana, getShortKanji, prefectureByKanji } from '../data/prefectures';
 import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
 import { getPrefectureLabelLayout, allowsSeaPrefectureLabel } from '../utils/mapLabels';
+import { ADVENTURE_WORLD_SCALE_W } from '../utils/mapPositions';
 import { prefectureCapitalByKanji } from '../data/prefectureCapitals';
 import {
   createMainlandPathGenerator,
@@ -59,13 +60,13 @@ export function JapanMap({
   const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);
   const strokeWidth = fixedSize
-    ? Math.max(0.35, (width / 6.5) * 0.0016)
+    ? Math.max(0.35, (width / ADVENTURE_WORLD_SCALE_W) * 0.0016)
     : Math.max(1, width * 0.002);
   const labelFontSize = fixedSize
-    ? Math.max(8, Math.min(14, (width / 6.5) * 0.02))
+    ? Math.max(8, Math.min(14, (width / ADVENTURE_WORLD_SCALE_W) * 0.02))
     : Math.max(11, Math.min(15, width * 0.024));
   const insetLabelFontSize = fixedSize
-    ? Math.max(8, Math.min(12, (width / 6.5) * 0.018))
+    ? Math.max(8, Math.min(12, (width / ADVENTURE_WORLD_SCALE_W) * 0.018))
     : Math.max(10, Math.min(13, width * 0.02));
 
   const visibleMainland = useMemo(() => {

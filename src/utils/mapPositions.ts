@@ -19,11 +19,15 @@ export interface MapPoint {
   y: number;
 }
 
+/** たんけんモード：ビューポートに対するワールド倍率（大きいほど引きの地図） */
+export const ADVENTURE_WORLD_SCALE_W = 6.5 / 1.5;
+export const ADVENTURE_WORLD_SCALE_H = 5.5 / 1.5;
+
 /** 画面に約1地方が入るようワールドを拡大 */
 export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
   return {
-    width: Math.round(viewportW * 6.5),
-    height: Math.round(viewportH * 5.5),
+    width: Math.round(viewportW * ADVENTURE_WORLD_SCALE_W),
+    height: Math.round(viewportH * ADVENTURE_WORLD_SCALE_H),
   };
 }
 
