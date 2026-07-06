@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
-import { useMapSize } from '../hooks/useMapSize';
 import { prefectures, type Prefecture } from '../data/prefectures';
 import { usePlayer } from '../context/PlayerContext';
 import { BOSS_IMAGE, type AvatarLevel } from '../data/characterAssets';
@@ -75,6 +74,29 @@ function stepFromMotion(moving: boolean, frame: number): CharStep {
   return frame % 2 === 0 ? 'rightFoot' : 'leftFoot';
 }
 
+function usePlayAreaSize(containerRef: RefObject<HTMLElement | null>) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      setSize({
+        width: Math.max(0, Math.floor(el.clientWidth)),
+        height: Math.max(0, Math.floor(el.clientHeight)),
+      });
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [containerRef]);
+
+  return size;
+}
+
 export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const { activePlayer } = usePlayer();
   const defaultAvatar = activePlayer ? resolveAvatarLevel(activePlayer.progress) : 1;
@@ -82,11 +104,13 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [phase, setPhase] = useState<Phase>('pick-avatar');
   const [chosenAvatar, setChosenAvatar] = useState<AvatarLevel>(defaultAvatar);
   const [pendingStart, setPendingStart] = useState(false);
+  const mapAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const { width: viewW, height: viewH } = useMapSize(viewportRef);
+  const { width: viewW, height: viewH } = usePlayAreaSize(mapAreaRef);
+  const viewReady = viewW >= 200 && viewH >= 200;
   const worldSize = useMemo(
-    () => (viewW >= 200 ? buildWorldSize(viewW, viewH) : { width: 0, height: 0 }),
-    [viewW, viewH],
+    () => (viewReady ? buildWorldSize(viewW, viewH) : { width: 0, height: 0 }),
+    [viewReady, viewW, viewH],
   );
 
   const [startPref, setStartPref] = useState<Prefecture | null>(null);
@@ -244,10 +268,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, []);
 
   useEffect(() => {
-    if (!pendingStart || phase !== 'play' || worldSize.width < 200 || capitals.size === 0) return;
+    if (!pendingStart || phase !== 'play' || !viewReady || capitals.size === 0) return;
     initRound();
     setPendingStart(false);
-  }, [pendingStart, phase, worldSize.width, capitals.size, initRound]);
+  }, [pendingStart, phase, viewReady, viewW, viewH, capitals.size, initRound]);
 
   const applyPointerRef = useRef(applyPointerToPlayer);
   applyPointerRef.current = applyPointerToPlayer;
@@ -426,9 +450,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         <h2>🚶 アバターたんけん</h2>
       </header>
 
-      <PlayerStatus />
-
-      <div className="adventure-hud">
+      <div className="adventure-top-bar">
+        <PlayerStatus />
         <div className="adventure-goal-banner">
           <span className="adventure-goal-eyebrow">もくてきち</span>
           <p className="adventure-goal-main">
@@ -439,10 +462,9 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <p className="adventure-goal-hiragana">（{goalPref.hiragana}）</p>
           )}
         </div>
-        {oniActive && !oniIntro && <p className="adventure-warning">👹 にげろ！</p>}
       </div>
 
-      <div className="adventure-play-area">
+      <div className="adventure-play-area" ref={mapAreaRef}>
         <div
           ref={viewportRef}
           className="adventure-viewport map-container adventure-map"
@@ -450,7 +472,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
         >
-          {worldSize.width >= 200 && (
+          {oniActive && !oniIntro && (
+            <p className="adventure-warning adventure-warning--map">👹 にげろ！</p>
+          )}
+          {viewReady && worldSize.width >= 200 && (
             <div
               className="adventure-world"
               style={{
