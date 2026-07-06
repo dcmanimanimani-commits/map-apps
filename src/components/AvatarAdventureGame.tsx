@@ -44,7 +44,7 @@ const CATCH_RADIUS = 34;
 const CHAR_SIZE = 76;
 const ONI_SIZE = 92;
 /** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
-const PLAYER_FOLLOW_RATE = 0.34;
+const PLAYER_FOLLOW_RATE = 0.17;
 
 const START_EXCLUDED_KANJI = new Set(['北海道', '沖縄県']);
 const START_REGIONS = new Set(['東北', '関東', '中部', '近畿', '中国', '四国', '九州']);
