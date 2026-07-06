@@ -122,8 +122,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   capitalsRef.current = capitals;
 
   const capitalMarkerSize = useMemo(() => {
-    if (viewW < 200) return 26;
-    return Math.round(Math.max(24, Math.min(42, viewW * 0.058)));
+    if (viewW < 200) return Math.round(26 * 0.8);
+    return Math.round(Math.max(24, Math.min(42, viewW * 0.058)) * 0.8);
   }, [viewW]);
 
   const camera = useMemo(
@@ -304,7 +304,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <li>🚩 スタートは本州・四国・九州の県庁所在地</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
-            <li>👹 3秒後、<strong>画面の端</strong>の別の県の県庁所在地から鬼が現れる！</li>
+            <li>👹 3秒後、<strong>画面の端ぎりぎり</strong>の別の県の県庁所在地（◎）から鬼が現れる！</li>
           </ul>
           <button type="button" className="btn-primary" onClick={requestStart}>たんけんスタート！</button>
         </div>

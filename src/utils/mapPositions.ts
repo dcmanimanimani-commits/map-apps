@@ -204,22 +204,7 @@ export function findNearestPrefectureByCapital(
   return bestKanji;
 }
 
-function isOutsideViewport(
-  pos: MapPoint,
-  camera: MapPoint,
-  viewW: number,
-  viewH: number,
-  margin = 0,
-): boolean {
-  return (
-    pos.x < camera.x - margin ||
-    pos.x > camera.x + viewW + margin ||
-    pos.y < camera.y - margin ||
-    pos.y > camera.y + viewH + margin
-  );
-}
-
-function isNearViewportEdgeBand(
+function isJustInsideViewportEdge(
   pos: MapPoint,
   camera: MapPoint,
   viewW: number,
@@ -228,14 +213,14 @@ function isNearViewportEdgeBand(
 ): boolean {
   const relX = pos.x - camera.x;
   const relY = pos.y - camera.y;
-  if (relX < 0 || relX > viewW || relY < 0 || relY > viewH) return false;
+  if (relX <= 0 || relX >= viewW || relY <= 0 || relY >= viewH) return false;
   const bandX = viewW * bandRatio;
   const bandY = viewH * bandRatio;
   return relX < bandX || relX > viewW - bandX || relY < bandY || relY > viewH - bandY;
 }
 
 /**
- * 画面外または画面端付近の、プレイヤーと別県の県庁所在地から鬼を出現させる。
+ * 画面内側の端付近にある、プレイヤーと別県の県庁所在地から鬼を出現させる。
  */
 export function pickOniSpawnAtEdgeCapital(
   player: MapPoint,
@@ -251,28 +236,25 @@ export function pickOniSpawnAtEdgeCapital(
     findPrefectureAtPoint(player, geo, worldW, worldH) ??
     findNearestPrefectureByCapital(player, capitals);
 
-  const minDist = Math.min(viewW, viewH) * 0.5;
-  const edgeBand = 0.14;
-  const outsideCandidates: { pos: MapPoint; dist: number }[] = [];
-  const bandCandidates: { pos: MapPoint; dist: number }[] = [];
+  const minDist = Math.min(viewW, viewH) * 0.38;
+  const edgeBand = 0.11;
+  const candidates: { pos: MapPoint; dist: number; edgeScore: number }[] = [];
 
   for (const [kanji, pos] of capitals) {
     if (kanji === playerPref) continue;
     const dist = mapDistance(player, pos);
     if (dist < minDist) continue;
+    if (!isJustInsideViewportEdge(pos, camera, viewW, viewH, edgeBand)) continue;
 
-    if (isOutsideViewport(pos, camera, viewW, viewH)) {
-      outsideCandidates.push({ pos, dist });
-    } else if (isNearViewportEdgeBand(pos, camera, viewW, viewH, edgeBand)) {
-      bandCandidates.push({ pos, dist });
-    }
+    const relX = pos.x - camera.x;
+    const relY = pos.y - camera.y;
+    const edgeDist = Math.min(relX, viewW - relX, relY, viewH - relY);
+    candidates.push({ pos, dist, edgeScore: edgeDist });
   }
 
-  const pool = outsideCandidates.length > 0 ? outsideCandidates : bandCandidates;
-
-  if (pool.length > 0) {
-    pool.sort((a, b) => b.dist - a.dist);
-    const top = pool.slice(0, Math.min(6, pool.length));
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => a.edgeScore - b.edgeScore || b.dist - a.dist);
+    const top = candidates.slice(0, Math.min(8, candidates.length));
     return top[Math.floor(Math.random() * top.length)].pos;
   }
 
