@@ -10,6 +10,7 @@ import {
   buildPrefectureCapitalPositions,
   buildWorldSize,
   clampToMap,
+  clientToWorld,
   getCamera,
   mapDistance,
   moveToward,
@@ -98,7 +99,13 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [animFrame, setAnimFrame] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
 
-  const pointerRef = useRef({ active: false, lastClientX: 0, lastClientY: 0 });
+  const pointerRef = useRef({
+    active: false,
+    clientX: 0,
+    clientY: 0,
+    grabOffsetX: 0,
+    grabOffsetY: 0,
+  });
   const playerPosRef = useRef(playerPos);
   const oniPosRef = useRef<MapPoint | null>(null);
   const oniActiveRef = useRef(false);
@@ -150,8 +157,58 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setCountdown(3);
     setAnimFrame(0);
     setIsMoving(false);
-    pointerRef.current = { active: false, lastClientX: 0, lastClientY: 0 };
+    pointerRef.current = {
+      active: false,
+      clientX: 0,
+      clientY: 0,
+      grabOffsetX: 0,
+      grabOffsetY: 0,
+    };
   }, [capitals]);
+
+  const applyPointerToPlayer = useCallback(() => {
+    const ptr = pointerRef.current;
+    if (!ptr.active) return false;
+
+    const el = viewportRef.current;
+    if (!el) return false;
+
+    const rect = el.getBoundingClientRect();
+    const { width: vw, height: vh } = viewSizeRef.current;
+    const { width: ww, height: wh } = worldSizeRef.current;
+    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
+    const touch = clientToWorld(ptr.clientX, ptr.clientY, rect, cam);
+    const before = playerPosRef.current;
+    const nextPlayer = clampToMap(
+      {
+        x: touch.x - ptr.grabOffsetX,
+        y: touch.y - ptr.grabOffsetY,
+      },
+      ww,
+      wh,
+    );
+
+    const dx = nextPlayer.x - before.x;
+    const dy = nextPlayer.y - before.y;
+
+    playerPosRef.current = nextPlayer;
+    if (dx !== 0 || dy !== 0) {
+      setPlayerPos(nextPlayer);
+      lastDirRef.current = directionFromVector(dx, dy);
+    }
+    setIsMoving(true);
+    return true;
+  }, []);
+
+  const worldPointFromClient = useCallback((clientX: number, clientY: number) => {
+    const el = viewportRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const { width: vw, height: vh } = viewSizeRef.current;
+    const { width: ww, height: wh } = worldSizeRef.current;
+    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
+    return clientToWorld(clientX, clientY, rect, cam);
+  }, []);
 
   const requestStart = useCallback(() => {
     setPhase('play');
@@ -164,43 +221,35 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setPendingStart(false);
   }, [pendingStart, phase, worldSize.width, capitals.size, initRound]);
 
+  const applyPointerRef = useRef(applyPointerToPlayer);
+  applyPointerRef.current = applyPointerToPlayer;
+
   const handlePlayerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'play') return;
     e.preventDefault();
     e.stopPropagation();
+
+    const touch = worldPointFromClient(e.clientX, e.clientY);
+    if (!touch) return;
+
     pointerRef.current = {
       active: true,
-      lastClientX: e.clientX,
-      lastClientY: e.clientY,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      grabOffsetX: touch.x - playerPosRef.current.x,
+      grabOffsetY: touch.y - playerPosRef.current.y,
     };
     viewportRef.current?.setPointerCapture(e.pointerId);
-  }, []);
+    applyPointerToPlayer();
+  }, [worldPointFromClient, applyPointerToPlayer]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!pointerRef.current.active) return;
     e.preventDefault();
-
-    const dx = e.clientX - pointerRef.current.lastClientX;
-    const dy = e.clientY - pointerRef.current.lastClientY;
-    pointerRef.current.lastClientX = e.clientX;
-    pointerRef.current.lastClientY = e.clientY;
-
-    if (dx === 0 && dy === 0) return;
-
-    const { width: ww, height: wh } = worldSizeRef.current;
-    const nextPlayer = clampToMap(
-      {
-        x: playerPosRef.current.x + dx,
-        y: playerPosRef.current.y + dy,
-      },
-      ww,
-      wh,
-    );
-    playerPosRef.current = nextPlayer;
-    setPlayerPos(nextPlayer);
-    setIsMoving(true);
-    lastDirRef.current = directionFromVector(dx, dy);
-  }, []);
+    pointerRef.current.clientX = e.clientX;
+    pointerRef.current.clientY = e.clientY;
+    applyPointerToPlayer();
+  }, [applyPointerToPlayer]);
 
   const handlePointerEnd = useCallback((e: React.PointerEvent) => {
     if (!pointerRef.current.active) return;
@@ -249,6 +298,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
     const tick = () => {
       if (phaseRef.current !== 'play') return;
+
+      if (pointerRef.current.active) {
+        applyPointerRef.current();
+      }
 
       const nextPlayer = playerPosRef.current;
 
