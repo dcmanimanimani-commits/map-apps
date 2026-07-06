@@ -375,6 +375,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
               <JapanMap
                 geo={geo}
                 fixedSize={worldSize}
+                showPrefectureLabels
                 interactive={false}
                 renderOverlay={() => (
                   <div

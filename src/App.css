@@ -1136,7 +1136,7 @@
 .prefecture-label-kanji {
   fill: #ffffff;
   stroke: #1e3a5f;
-  stroke-width: 2.5px;
+  stroke-width: 0.2em;
   paint-order: stroke fill;
   font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
 }
@@ -1144,7 +1144,7 @@
 .prefecture-label-hiragana {
   fill: #fff7ed;
   stroke: #1e3a5f;
-  stroke-width: 2.5px;
+  stroke-width: 0.18em;
   paint-order: stroke fill;
   font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
   letter-spacing: 0.02em;

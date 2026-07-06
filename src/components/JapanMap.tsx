@@ -1,9 +1,10 @@
-import { useMemo, useRef, type ReactNode } from 'react';
+import { useId, useMemo, useRef, type ReactNode } from 'react';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
 import { getRegionColor, getShortHiragana, getShortKanji, prefectureByKanji } from '../data/prefectures';
 import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
+import { getPrefectureLabelLayout } from '../utils/mapLabels';
 import {
   createMainlandPathGenerator,
   createOkinawaFullPathGenerator,
@@ -11,7 +12,6 @@ import {
   createRegionFocusPathGenerator,
   getFeatureKanji,
   getOkinawaInsetLayout,
-  getProjectedCentroid,
   MAINLAND_CLIP_ID,
   OKINAWA_CLIP_ID,
   OKINAWA_INSET_SCALE_FULL,
@@ -49,6 +49,7 @@ export function JapanMap({
   fixedSize,
   renderOverlay,
 }: JapanMapProps) {
+  const mapInstanceId = useId().replace(/:/g, '');
   const containerRef = useRef<HTMLDivElement>(null);
   const measured = useMapSize(containerRef);
   const width = fixedSize?.width ?? measured.width;
@@ -59,8 +60,12 @@ export function JapanMap({
   const strokeWidth = fixedSize
     ? Math.max(0.35, (width / 6.5) * 0.0016)
     : Math.max(1, width * 0.002);
-  const labelFontSize = Math.max(11, Math.min(15, width * 0.024));
-  const insetLabelFontSize = Math.max(10, Math.min(13, width * 0.02));
+  const labelFontSize = fixedSize
+    ? Math.max(8, Math.min(14, (width / 6.5) * 0.02))
+    : Math.max(11, Math.min(15, width * 0.024));
+  const insetLabelFontSize = fixedSize
+    ? Math.max(8, Math.min(12, (width / 6.5) * 0.018))
+    : Math.max(10, Math.min(13, width * 0.02));
 
   const visibleMainland = useMemo(() => {
     if (!isFocused || !focusKanjiSet) return mainland;
@@ -129,47 +134,82 @@ export function JapanMap({
     };
   }, [showOkinawaInset, okinawa, width, height, includesOkinawa, hasMainlandFocus]);
 
-  function buildLabel(kanji: string, x: number, y: number, fontSize = labelFontSize) {
+  interface MapLabel {
+    kanji: string;
+    name: string;
+    hiragana: string;
+    x: number;
+    y: number;
+    fontSize: number;
+    clip: boolean;
+    clipPathId?: string;
+  }
+
+  function buildLabel(
+    kanji: string,
+    feature: Feature<Geometry, GeoJsonProperties>,
+    pathGen: ReturnType<typeof createMainlandPathGenerator>,
+    pathD: string | null,
+    maxFontSize: number,
+    allowOutside = false,
+  ): MapLabel | null {
     const pref = prefectureByKanji.get(kanji);
+    const name = getShortKanji(kanji);
+    const hiragana = pref ? getShortHiragana(kanji, pref.hiragana) : '';
+    const layout = getPrefectureLabelLayout(feature, pathGen, name, hiragana, maxFontSize, {
+      allowOutside,
+    });
+    if (!layout) return null;
     return {
       kanji,
-      name: getShortKanji(kanji),
-      hiragana: pref ? getShortHiragana(kanji, pref.hiragana) : '',
-      x,
-      y,
-      fontSize,
+      name,
+      hiragana,
+      x: layout.x,
+      y: layout.y,
+      fontSize: layout.fontSize,
+      clip: layout.clip,
+      clipPathId: layout.clip && pathD ? `pref-clip-${mapInstanceId}-${kanji}` : undefined,
     };
   }
 
   const mainlandLabels = useMemo(() => {
-    if (!showPrefectureLabels || !isFocused) return [];
+    if (!showPrefectureLabels) return [];
 
-    const items: ReturnType<typeof buildLabel>[] = [];
+    const items: MapLabel[] = [];
 
     if (okinawaFullPath) {
-      const point = getProjectedCentroid(okinawaFullPath.feature, okinawaFullPath.pathGen);
-      if (point) items.push(buildLabel(OKINAWA_KANJI, point[0], point[1]));
+      const label = buildLabel(
+        OKINAWA_KANJI,
+        okinawaFullPath.feature,
+        okinawaFullPath.pathGen,
+        okinawaFullPath.d,
+        labelFontSize,
+        true,
+      );
+      if (label) items.push(label);
       return items;
     }
 
-    for (const { kanji, pathGen, feature } of mainlandPaths) {
-      const point = getProjectedCentroid(feature, pathGen);
-      if (!point) continue;
-      items.push(buildLabel(kanji, point[0], point[1]));
+    for (const { kanji, pathGen, feature, d } of mainlandPaths) {
+      const label = buildLabel(kanji, feature, pathGen, d, labelFontSize);
+      if (label) items.push(label);
     }
 
     return items;
-  }, [showPrefectureLabels, isFocused, okinawaFullPath, mainlandPaths, labelFontSize]);
+  }, [showPrefectureLabels, okinawaFullPath, mainlandPaths, labelFontSize, mapInstanceId]);
 
   const insetLabel = useMemo(() => {
-    if (!showPrefectureLabels || !okinawaInset || !includesOkinawa) return null;
-    if (okinawaFullPath) return null;
+    if (!showPrefectureLabels || !okinawaInset || okinawaFullPath) return null;
 
-    const point = getProjectedCentroid(okinawaInset.simplified, okinawaInset.pathGen);
-    if (!point) return null;
-
-    return buildLabel(OKINAWA_KANJI, point[0], point[1], insetLabelFontSize);
-  }, [showPrefectureLabels, okinawaInset, includesOkinawa, okinawaFullPath, insetLabelFontSize]);
+    return buildLabel(
+      OKINAWA_KANJI,
+      okinawaInset.simplified,
+      okinawaInset.pathGen,
+      okinawaInset.d,
+      insetLabelFontSize,
+      true,
+    );
+  }, [showPrefectureLabels, okinawaInset, okinawaFullPath, insetLabelFontSize, mapInstanceId]);
 
   function getFill(kanji: string, baseColor: string): string {
     if (correctKanji === kanji) return '#4ade80';
@@ -211,18 +251,19 @@ export function JapanMap({
     );
   }
 
-  function renderLabels(labels: ReturnType<typeof buildLabel>[]) {
+  function renderLabels(labels: MapLabel[]) {
     if (labels.length === 0) return null;
 
     return (
       <g className="prefecture-labels" pointerEvents="none">
-        {labels.map(({ kanji, name, hiragana, x, y, fontSize }) => (
+        {labels.map(({ kanji, name, hiragana, x, y, fontSize, clipPathId }) => (
           <text
             key={kanji}
             x={x}
             y={y}
             textAnchor="middle"
             dominantBaseline="middle"
+            clipPath={clipPathId ? `url(#${clipPathId})` : undefined}
             className={highlightedKanji === kanji ? 'prefecture-label-group highlighted' : 'prefecture-label-group'}
           >
             <tspan
@@ -279,6 +320,19 @@ export function JapanMap({
                 width={width - okinawaInset.layout.cornerX}
                 height={height - okinawaInset.layout.cornerY}
               />
+            </clipPath>
+          )}
+          {showPrefectureLabels &&
+            mainlandPaths.map(({ kanji, d }) =>
+              d ? (
+                <clipPath key={`clip-${kanji}`} id={`pref-clip-${mapInstanceId}-${kanji}`}>
+                  <path d={d} />
+                </clipPath>
+              ) : null,
+            )}
+          {showPrefectureLabels && okinawaFullPath?.d && (
+            <clipPath id={`pref-clip-${mapInstanceId}-${OKINAWA_KANJI}`}>
+              <path d={okinawaFullPath.d} />
             </clipPath>
           )}
         </defs>
