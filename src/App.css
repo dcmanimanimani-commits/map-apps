@@ -2925,6 +2925,8 @@ html.boss-no-select .scribble-kanji-input {
 
 .map-char--player .map-char-img {
   transform: none;
+  /* 画像の見た目重心が左寄りのため、地図ビュー中央に合わせる（座標は変えない） */
+  object-position: 53% center;
 }
 
 .map-char--player.map-char--moving.map-char--rightFoot .map-char-img {
