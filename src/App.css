@@ -2846,6 +2846,7 @@ html.boss-no-select .scribble-kanji-input {
   width: min(72vw, 320px);
   height: min(52dvh, 360px);
   object-fit: contain;
+  background: transparent;
   filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.45));
   animation: adventure-oni-splash-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -2918,6 +2919,7 @@ html.boss-no-select .scribble-kanji-input {
   height: 100%;
   object-fit: contain;
   display: block;
+  background: transparent;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
 }
 
