@@ -20,6 +20,7 @@ export const TITLES: { minLevel: number; title: string }[] = [
   { minLevel: 6, title: 'おばあちゃん猫レベル' },
   { minLevel: 7, title: 'むし歯だらけのライオンレベル' },
   { minLevel: 8, title: 'マッチョの象レベル' },
+  { minLevel: 9, title: '気弱なティラノサウルスレベル' },
 ];
 
 const XP_PER_REGION = 100;
@@ -34,8 +35,12 @@ export function getTitleLevel(title: string): number {
   return TITLES.find((t) => t.title === title)?.minLevel ?? 1;
 }
 
+export function getMaxAvatarLevel(): AvatarLevel {
+  return Math.max(...TITLES.map((t) => t.minLevel)) as AvatarLevel;
+}
+
 export function getMaxUnlockedAvatarLevel(level: number): AvatarLevel {
-  return Math.min(Math.max(1, level), 8) as AvatarLevel;
+  return Math.min(Math.max(1, level), getMaxAvatarLevel()) as AvatarLevel;
 }
 
 export function resolveAvatarLevel(progress: PlayerProgress): AvatarLevel {

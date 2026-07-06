@@ -2,6 +2,7 @@ import type { AvatarLevel } from '../data/characterAssets';
 import {
   getMaxUnlockedAvatarLevel,
   resolveAvatarLevel,
+  TITLES,
   type PlayerProgress,
 } from '../data/progress';
 import { getAvatarTitle, PlayerAvatar } from './PlayerAvatar';
@@ -13,7 +14,7 @@ interface AvatarPickerProps {
   onSelect: (level: AvatarLevel) => void;
 }
 
-const ALL_LEVELS: AvatarLevel[] = [1, 2, 3, 4, 5, 6, 7, 8];
+const ALL_LEVELS: AvatarLevel[] = TITLES.map((t) => t.minLevel as AvatarLevel);
 
 export function AvatarPicker({ open, progress, onClose, onSelect }: AvatarPickerProps) {
   if (!open) return null;
