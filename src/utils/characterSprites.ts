@@ -32,8 +32,8 @@ export function getAvatarFallbackSrc(level: AvatarLevel): string {
   return AVATAR_IMAGES[level];
 }
 
-export function getAvatarSpriteSrc(level: AvatarLevel, dir: CharDirection, step: CharStep): string {
-  return getAvatarSpritePath(level, dir, step);
+export function getAvatarSpriteSrc(level: AvatarLevel, _dir: CharDirection, _step: CharStep): string {
+  return getAvatarFallbackSrc(level);
 }
 
 export function getOniSpriteSrc(_dir: CharDirection, _step: CharStep): string {
