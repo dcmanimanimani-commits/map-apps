@@ -304,7 +304,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <li>🚩 スタートは本州・四国・九州の県庁所在地</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
-            <li>👹 3秒後、<strong>画面の端ぎりぎり</strong>の別の県の県庁所在地（◎）から鬼が現れる！</li>
+            <li>👹 3秒後、<strong>画面の外</strong>の別の県の県庁所在地（◎）から鬼が現れる！</li>
           </ul>
           <button type="button" className="btn-primary" onClick={requestStart}>たんけんスタート！</button>
         </div>
