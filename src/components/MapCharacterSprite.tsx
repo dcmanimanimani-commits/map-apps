@@ -9,6 +9,8 @@ interface MapCharacterSpriteProps {
   step: CharStep;
   className?: string;
   label?: string;
+  interactive?: boolean;
+  onPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 export function MapCharacterSprite({
@@ -20,12 +22,14 @@ export function MapCharacterSprite({
   step,
   className = '',
   label,
+  interactive = false,
+  onPointerDown,
 }: MapCharacterSpriteProps) {
   const moving = step !== 'idle';
 
   return (
     <div
-      className={`map-char ${moving ? 'map-char--moving' : ''} map-char--${direction} map-char--${step} ${className}`.trim()}
+      className={`map-char ${moving ? 'map-char--moving' : ''} map-char--${direction} map-char--${step} ${interactive ? 'map-char--interactive' : ''} ${className}`.trim()}
       style={{
         left: x,
         top: y,
@@ -36,6 +40,7 @@ export function MapCharacterSprite({
       }}
       aria-hidden={!label}
       title={label}
+      onPointerDown={interactive ? onPointerDown : undefined}
     >
       <img src={imageSrc} alt="" className="map-char-img" draggable={false} />
     </div>

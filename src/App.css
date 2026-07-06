@@ -2628,7 +2628,6 @@ html.boss-no-select .scribble-kanji-input {
   overflow: hidden;
   position: relative;
   touch-action: none;
-  cursor: crosshair;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -2695,6 +2694,31 @@ html.boss-no-select .scribble-kanji-input {
   position: absolute;
   z-index: 2;
   pointer-events: none;
+}
+
+.map-char--interactive {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+  z-index: 3;
+}
+
+.map-char--interactive::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(100% + 28px);
+  height: calc(100% + 28px);
+  transform: translate(-50%, -50%);
+}
+
+.adventure-viewport:has(.map-char--interactive:active) {
+  cursor: grabbing;
+}
+
+.map-char--interactive:active {
+  cursor: grabbing;
 }
 
 .map-char-img {

@@ -9,7 +9,6 @@ import {
   buildPrefectureCentroids,
   buildWorldSize,
   clampToMap,
-  clientToWorld,
   getCamera,
   mapDistance,
   moveToward,
@@ -33,7 +32,6 @@ interface AvatarAdventureGameProps {
 
 type Phase = 'intro' | 'play' | 'win' | 'lose';
 
-const PLAYER_SPEED = 4.2;
 const ONI_SPEED = 3.75;
 const ONI_DELAY_MS = 3000;
 const ARRIVE_RADIUS = 36;
@@ -101,7 +99,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [animFrame, setAnimFrame] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
 
-  const pointerRef = useRef({ active: false, worldX: 0, worldY: 0 });
+  const pointerRef = useRef({ active: false, lastClientX: 0, lastClientY: 0 });
   const playerPosRef = useRef(playerPos);
   const oniPosRef = useRef<MapPoint | null>(null);
   const oniActiveRef = useRef(false);
@@ -141,7 +139,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setCountdown(3);
     setAnimFrame(0);
     setIsMoving(false);
-    pointerRef.current = { active: false, worldX: 0, worldY: 0 };
+    pointerRef.current = { active: false, lastClientX: 0, lastClientY: 0 };
   }, [centroids]);
 
   const requestStart = useCallback(() => {
@@ -155,38 +153,51 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setPendingStart(false);
   }, [pendingStart, phase, worldSize.width, centroids.size, initRound]);
 
-  const updatePointerWorld = useCallback((clientX: number, clientY: number) => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const cam = getCamera(
-      playerPosRef.current,
-      rect.width,
-      rect.height,
-      worldSizeRef.current.width,
-      worldSizeRef.current.height,
-    );
-    const world = clientToWorld(clientX, clientY, rect, cam);
-    pointerRef.current = { ...pointerRef.current, worldX: world.x, worldY: world.y };
-  }, []);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+  const handlePlayerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'play') return;
     e.preventDefault();
-    pointerRef.current.active = true;
-    updatePointerWorld(e.clientX, e.clientY);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, [updatePointerWorld]);
+    e.stopPropagation();
+    pointerRef.current = {
+      active: true,
+      lastClientX: e.clientX,
+      lastClientY: e.clientY,
+    };
+    viewportRef.current?.setPointerCapture(e.pointerId);
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!pointerRef.current.active) return;
     e.preventDefault();
-    updatePointerWorld(e.clientX, e.clientY);
-  }, [updatePointerWorld]);
 
-  const handlePointerEnd = useCallback(() => {
+    const dx = e.clientX - pointerRef.current.lastClientX;
+    const dy = e.clientY - pointerRef.current.lastClientY;
+    pointerRef.current.lastClientX = e.clientX;
+    pointerRef.current.lastClientY = e.clientY;
+
+    if (dx === 0 && dy === 0) return;
+
+    const { width: ww, height: wh } = worldSizeRef.current;
+    const nextPlayer = clampToMap(
+      {
+        x: playerPosRef.current.x + dx,
+        y: playerPosRef.current.y + dy,
+      },
+      ww,
+      wh,
+    );
+    playerPosRef.current = nextPlayer;
+    setPlayerPos(nextPlayer);
+    setIsMoving(true);
+    lastDirRef.current = directionFromVector(dx, dy);
+  }, []);
+
+  const handlePointerEnd = useCallback((e: React.PointerEvent) => {
+    if (!pointerRef.current.active) return;
     pointerRef.current.active = false;
     setIsMoving(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   }, []);
 
   useEffect(() => {
@@ -210,34 +221,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const tick = () => {
       if (phaseRef.current !== 'play') return;
 
-      const { width: ww, height: wh } = worldSizeRef.current;
-      let nextPlayer = playerPosRef.current;
-      let moving = false;
-
-      if (pointerRef.current.active) {
-        const before = nextPlayer;
-        nextPlayer = moveToward(
-          nextPlayer,
-          { x: pointerRef.current.worldX, y: pointerRef.current.worldY },
-          PLAYER_SPEED,
-        );
-        nextPlayer = clampToMap(nextPlayer, ww, wh);
-        moving = mapDistance(before, nextPlayer) > 0.1;
-        if (moving) {
-          lastDirRef.current = directionFromVector(
-            nextPlayer.x - before.x,
-            nextPlayer.y - before.y,
-          );
-        }
-      }
-
-      if (moving) {
-        playerPosRef.current = nextPlayer;
-        setPlayerPos(nextPlayer);
-        setIsMoving(true);
-      } else {
-        setIsMoving(false);
-      }
+      const nextPlayer = playerPosRef.current;
 
       if (oniActiveRef.current && oniPosRef.current) {
         const nextOni = moveToward(oniPosRef.current, nextPlayer, ONI_SPEED);
@@ -289,7 +273,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           <p className="adventure-intro-lead">手に入れたアバターで日本地図を歩こう！</p>
           <ul className="adventure-intro-rules">
             <li>🎯 県の中の<strong>目的地</strong>までたどり着け！</li>
-            <li>👆 指やPencilで<strong>タップ</strong>した方向へ歩ける</li>
+            <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
             <li>👹 開始<strong>3秒後</strong>、もんだい大王が追いかけてくる！</li>
           </ul>
@@ -354,11 +338,9 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         <div
           ref={viewportRef}
           className="adventure-viewport map-container adventure-map"
-          onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
-          onPointerLeave={handlePointerEnd}
         >
           {worldSize.width >= 200 && (
             <div
@@ -396,6 +378,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       direction={playerDir}
                       step={playerStep}
                       className="map-char--player"
+                      interactive
+                      onPointerDown={handlePlayerPointerDown}
                     />
                     {oniActive && oniPos && (
                       <MapCharacterSprite
@@ -413,7 +397,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
               />
             </div>
           )}
-          <p className="adventure-touch-hint">👆 タップした方向へ歩く</p>
+          <p className="adventure-touch-hint">👆 アバターをつかんでスライド</p>
         </div>
       </div>
 
