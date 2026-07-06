@@ -13,6 +13,9 @@ const SPRITE_DIR = path.join(CHAR_DIR, 'sprites');
 
 const AVATAR_BG_TOLERANCE = 58;
 const AVATAR_EDGE_SOFTNESS = 42;
+/** 鬼大王は外周の暗い背景だけ軽く透過（旗・本体は残す） */
+const BOSS_BG_TOLERANCE = 28;
+const BOSS_EDGE_SOFTNESS = 18;
 
 function colorDist(r, g, b, br, bg, bb) {
   const dr = r - br;
@@ -133,13 +136,12 @@ function isBossImage(filePath) {
 }
 
 async function processFile(filePath) {
-  if (isBossImage(filePath)) {
-    console.log(`  skip ${path.relative(ROOT, filePath)} (use original full artwork)`);
-    return;
-  }
+  const boss = isBossImage(filePath);
+  const tolerance = boss ? BOSS_BG_TOLERANCE : AVATAR_BG_TOLERANCE;
+  const edgeSoftness = boss ? BOSS_EDGE_SOFTNESS : AVATAR_EDGE_SOFTNESS;
 
   const { data, info } = await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const bg = floodFillBackground(data, info.width, info.height, AVATAR_BG_TOLERANCE, AVATAR_EDGE_SOFTNESS);
+  const bg = floodFillBackground(data, info.width, info.height, tolerance, edgeSoftness);
 
   const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
     .webp({ quality: 92, alphaQuality: 100, effort: 4 })
@@ -156,7 +158,6 @@ async function processFile(filePath) {
 
 function syncStagedFiles(files) {
   for (const filePath of files) {
-    if (isBossImage(filePath)) continue;
     const rel = path.relative(CHAR_DIR, filePath);
     const staged = path.join(CHAR_DIR, '_processed', rel);
     const from = staged.replace(/'/g, "''");

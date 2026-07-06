@@ -36,8 +36,7 @@ interface AvatarAdventureGameProps {
 
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 
-const ONI_SPEED = 3.75;
-const ONI_DELAY_MS = 3000;
+const ONI_SPEED = 5.625;
 const ONI_INTRO_MS = 1000;
 const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
@@ -97,7 +96,6 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [oniPos, setOniPos] = useState<MapPoint | null>(null);
   const [oniActive, setOniActive] = useState(false);
   const [oniIntro, setOniIntro] = useState(false);
-  const [countdown, setCountdown] = useState(3);
   const [animFrame, setAnimFrame] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
 
@@ -117,6 +115,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const lastDirRef = useRef<CharDirection>('down');
   const worldSizeRef = useRef(worldSize);
   const viewSizeRef = useRef({ width: viewW, height: viewH });
+  const geoRef = useRef(geo);
 
   playerPosRef.current = playerPos;
   oniPosRef.current = oniPos;
@@ -143,6 +142,32 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     [playerPos, viewW, viewH, worldSize.width, worldSize.height],
   );
 
+  worldSizeRef.current = worldSize;
+  viewSizeRef.current = { width: viewW, height: viewH };
+  geoRef.current = geo;
+
+  const spawnOni = useCallback(() => {
+    const { width: ww, height: wh } = worldSizeRef.current;
+    const { width: vw, height: vh } = viewSizeRef.current;
+    if (ww < 200 || capitalsRef.current.size === 0) return;
+
+    const spawn = pickOniSpawnAtEdgeCapital(
+      playerPosRef.current,
+      geoRef.current,
+      ww,
+      wh,
+      vw,
+      vh,
+      capitalsRef.current,
+    );
+    setOniPos(spawn);
+    oniPosRef.current = spawn;
+    setOniActive(true);
+    oniActiveRef.current = true;
+    setOniIntro(true);
+    oniChasePausedRef.current = true;
+  }, []);
+
   const initRound = useCallback(() => {
     const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(capitals);
     setStartPref(start);
@@ -156,7 +181,6 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     oniActiveRef.current = false;
     setOniIntro(false);
     oniChasePausedRef.current = false;
-    setCountdown(3);
     setAnimFrame(0);
     setIsMoving(false);
     pointerRef.current = {
@@ -166,7 +190,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       grabOffsetX: 0,
       grabOffsetY: 0,
     };
-  }, [capitals]);
+    spawnOni();
+  }, [capitals, spawnOni]);
 
   const applyPointerToPlayer = useCallback(() => {
     const ptr = pointerRef.current;
@@ -263,37 +288,16 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, []);
 
   useEffect(() => {
+    if (!oniIntro || phase !== 'play') return;
+    const introClearTimer = window.setTimeout(() => {
+      setOniIntro(false);
+      oniChasePausedRef.current = false;
+    }, ONI_INTRO_MS);
+    return () => clearTimeout(introClearTimer);
+  }, [oniIntro, phase]);
+
+  useEffect(() => {
     if (phase !== 'play' || worldSize.width < 200) return;
-
-    let introClearTimer: number | undefined;
-
-    const oniTimer = window.setTimeout(() => {
-      const { width: ww, height: wh } = worldSizeRef.current;
-      const { width: vw, height: vh } = viewSizeRef.current;
-      const spawn = pickOniSpawnAtEdgeCapital(
-        playerPosRef.current,
-        geo,
-        ww,
-        wh,
-        vw,
-        vh,
-        capitalsRef.current,
-      );
-      setOniPos(spawn);
-      oniPosRef.current = spawn;
-      setOniActive(true);
-      oniActiveRef.current = true;
-      setOniIntro(true);
-      oniChasePausedRef.current = true;
-      introClearTimer = window.setTimeout(() => {
-        setOniIntro(false);
-        oniChasePausedRef.current = false;
-      }, ONI_INTRO_MS);
-    }, ONI_DELAY_MS);
-
-    const countInterval = window.setInterval(() => {
-      setCountdown((c) => Math.max(0, c - 1));
-    }, 1000);
 
     let raf = 0;
     let frame = 0;
@@ -333,12 +337,9 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     raf = requestAnimationFrame(tick);
 
     return () => {
-      clearTimeout(oniTimer);
-      if (introClearTimer !== undefined) clearTimeout(introClearTimer);
-      clearInterval(countInterval);
       cancelAnimationFrame(raf);
     };
-  }, [phase, geo, worldSize.width]);
+  }, [phase, worldSize.width]);
 
   const playerStep = stepFromMotion(isMoving, animFrame);
   const playerDir = lastDirRef.current;
@@ -380,7 +381,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <li>🚩 スタートは本州・四国・九州の県庁所在地</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
-            <li>👹 3秒後、<strong>画面の外</strong>の別の県の県庁所在地（◎）から鬼が現れる！</li>
+            <li>👹 スタートと同時に、<strong>画面の外</strong>の別の県の県庁所在地（◎）から鬼が現れる！</li>
           </ul>
           <button type="button" className="btn-primary" onClick={requestStart}>たんけんスタート！</button>
         </div>
@@ -440,9 +441,6 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <p className="adventure-goal-hiragana">（{goalPref.hiragana}）</p>
           )}
         </div>
-        {!oniActive && countdown > 0 && (
-          <p className="adventure-countdown">鬼まで {countdown}…</p>
-        )}
         {oniActive && !oniIntro && <p className="adventure-warning">👹 にげろ！</p>}
       </div>
 
