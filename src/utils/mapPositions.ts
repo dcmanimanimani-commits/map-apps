@@ -235,6 +235,59 @@ function isNearViewportEdgeBand(
   return relX < bandX || relX > viewW - bandX || relY < bandY || relY > viewH - bandY;
 }
 
+function isNearExcluded(pos: MapPoint, excluded: MapPoint[], minGap: number): boolean {
+  return excluded.some((other) => mapDistance(pos, other) < minGap);
+}
+
+function collectOniSpawnCandidates(
+  player: MapPoint,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  viewW: number,
+  viewH: number,
+  capitals: Map<string, MapPoint>,
+  excluded: MapPoint[],
+  minGap: number,
+): MapPoint[] {
+  const camera = getCamera(player, viewW, viewH, worldW, worldH);
+  const playerPref =
+    findPrefectureAtPoint(player, geo, worldW, worldH) ??
+    findNearestPrefectureByCapital(player, capitals);
+
+  const minDist = Math.min(viewW, viewH) * 0.5;
+  const edgeBand = 0.14;
+  const outsideCandidates: { pos: MapPoint; dist: number }[] = [];
+  const bandCandidates: { pos: MapPoint; dist: number }[] = [];
+  const distantCandidates: { pos: MapPoint; dist: number }[] = [];
+
+  for (const [kanji, pos] of capitals) {
+    if (kanji === playerPref) continue;
+    if (isNearExcluded(pos, excluded, minGap)) continue;
+
+    const dist = mapDistance(player, pos);
+    if (dist < minDist) continue;
+
+    if (isOutsideViewport(pos, camera, viewW, viewH)) {
+      outsideCandidates.push({ pos, dist });
+    } else if (isNearViewportEdgeBand(pos, camera, viewW, viewH, edgeBand)) {
+      bandCandidates.push({ pos, dist });
+    } else {
+      distantCandidates.push({ pos, dist });
+    }
+  }
+
+  const pool =
+    outsideCandidates.length > 0
+      ? outsideCandidates
+      : bandCandidates.length > 0
+        ? bandCandidates
+        : distantCandidates;
+
+  pool.sort((a, b) => b.dist - a.dist);
+  return pool.map((entry) => entry.pos);
+}
+
 /**
  * 画面外（または端付近）の別県の県庁所在地から鬼を出現させる。
  */
@@ -246,41 +299,30 @@ export function pickOniSpawnAtEdgeCapital(
   viewW: number,
   viewH: number,
   capitals: Map<string, MapPoint>,
+  excluded: MapPoint[] = [],
 ): MapPoint {
-  const camera = getCamera(player, viewW, viewH, worldW, worldH);
-  const playerPref =
-    findPrefectureAtPoint(player, geo, worldW, worldH) ??
-    findNearestPrefectureByCapital(player, capitals);
+  const candidates = collectOniSpawnCandidates(
+    player,
+    geo,
+    worldW,
+    worldH,
+    viewW,
+    viewH,
+    capitals,
+    excluded,
+    48,
+  );
 
-  const minDist = Math.min(viewW, viewH) * 0.5;
-  const edgeBand = 0.14;
-  const outsideCandidates: { pos: MapPoint; dist: number }[] = [];
-  const bandCandidates: { pos: MapPoint; dist: number }[] = [];
-
-  for (const [kanji, pos] of capitals) {
-    if (kanji === playerPref) continue;
-    const dist = mapDistance(player, pos);
-    if (dist < minDist) continue;
-
-    if (isOutsideViewport(pos, camera, viewW, viewH)) {
-      outsideCandidates.push({ pos, dist });
-    } else if (isNearViewportEdgeBand(pos, camera, viewW, viewH, edgeBand)) {
-      bandCandidates.push({ pos, dist });
-    }
-  }
-
-  const pool = outsideCandidates.length > 0 ? outsideCandidates : bandCandidates;
-
-  if (pool.length > 0) {
-    pool.sort((a, b) => b.dist - a.dist);
-    const top = pool.slice(0, Math.min(6, pool.length));
-    return top[Math.floor(Math.random() * top.length)].pos;
+  if (candidates.length > 0) {
+    const top = candidates.slice(0, Math.min(6, candidates.length));
+    return top[Math.floor(Math.random() * top.length)];
   }
 
   let fallback: MapPoint | null = null;
   let fallbackDist = -1;
   for (const [kanji, pos] of capitals) {
-    if (kanji === playerPref) continue;
+    if (kanji === getPlayerPrefecture(player, geo, worldW, worldH, capitals)) continue;
+    if (isNearExcluded(pos, excluded, 48)) continue;
     const dist = mapDistance(player, pos);
     if (dist > fallbackDist) {
       fallbackDist = dist;
@@ -289,6 +331,36 @@ export function pickOniSpawnAtEdgeCapital(
   }
 
   return fallback ?? capitals.values().next().value ?? player;
+}
+
+function getPlayerPrefecture(
+  player: MapPoint,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  capitals: Map<string, MapPoint>,
+): string | null {
+  return findPrefectureAtPoint(player, geo, worldW, worldH) ?? findNearestPrefectureByCapital(player, capitals);
+}
+
+/** 大王＋小さい鬼用に、離れた県庁所在地から複数スポーン */
+export function pickMultipleOniSpawns(
+  count: number,
+  player: MapPoint,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  viewW: number,
+  viewH: number,
+  capitals: Map<string, MapPoint>,
+): MapPoint[] {
+  const spawns: MapPoint[] = [];
+  for (let i = 0; i < count; i++) {
+    spawns.push(
+      pickOniSpawnAtEdgeCapital(player, geo, worldW, worldH, viewW, viewH, capitals, spawns),
+    );
+  }
+  return spawns;
 }
 
 export function mapDistance(a: MapPoint, b: MapPoint): number {

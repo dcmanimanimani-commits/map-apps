@@ -14,7 +14,7 @@ import {
   getCamera,
   mapDistance,
   moveToward,
-  pickOniSpawnAtEdgeCapital,
+  pickMultipleOniSpawns,
   type MapPoint,
 } from '../utils/mapPositions';
 import {
@@ -36,11 +36,15 @@ interface AvatarAdventureGameProps {
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 
 const ONI_SPEED = 5.625;
+const MINION_COUNT = 3;
+/** 小さい鬼は大王よりゆっくり（とことこ） */
+const MINION_SPEEDS = [3.0, 3.25, 3.5] as const;
 const ONI_INTRO_MS = 1000;
 const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 152;
 const ONI_SIZE = 184;
+const MINION_SIZE = 96;
 /** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
 const PLAYER_FOLLOW_RATE = 0.036125;
 
@@ -93,6 +97,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [goalPref, setGoalPref] = useState<Prefecture | null>(null);
   const [playerPos, setPlayerPos] = useState<MapPoint>({ x: 350, y: 260 });
   const [oniPos, setOniPos] = useState<MapPoint | null>(null);
+  const [minionPositions, setMinionPositions] = useState<MapPoint[]>([]);
   const [oniActive, setOniActive] = useState(false);
   const [oniIntro, setOniIntro] = useState(false);
   const [animFrame, setAnimFrame] = useState(0);
@@ -107,6 +112,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   });
   const playerPosRef = useRef(playerPos);
   const oniPosRef = useRef<MapPoint | null>(null);
+  const minionPosRef = useRef<MapPoint[]>([]);
   const oniActiveRef = useRef(false);
   const oniChasePausedRef = useRef(false);
   const goalPosRef = useRef<MapPoint>({ x: 0, y: 0 });
@@ -118,6 +124,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
   playerPosRef.current = playerPos;
   oniPosRef.current = oniPos;
+  minionPosRef.current = minionPositions;
   oniActiveRef.current = oniActive;
   phaseRef.current = phase;
   worldSizeRef.current = worldSize;
@@ -150,7 +157,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const { width: vw, height: vh } = viewSizeRef.current;
     if (ww < 200 || capitalsRef.current.size === 0) return;
 
-    const spawn = pickOniSpawnAtEdgeCapital(
+    const spawns = pickMultipleOniSpawns(
+      MINION_COUNT + 1,
       playerPosRef.current,
       geoRef.current,
       ww,
@@ -159,8 +167,12 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       vh,
       capitalsRef.current,
     );
-    setOniPos(spawn);
-    oniPosRef.current = spawn;
+    const bossSpawn = spawns[0];
+    const minionSpawns = spawns.slice(1);
+    setOniPos(bossSpawn);
+    oniPosRef.current = bossSpawn;
+    setMinionPositions(minionSpawns);
+    minionPosRef.current = minionSpawns;
     setOniActive(true);
     oniActiveRef.current = true;
     setOniIntro(true);
@@ -176,6 +188,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     playerPosRef.current = startPos;
     setOniPos(null);
     oniPosRef.current = null;
+    setMinionPositions([]);
+    minionPosRef.current = [];
     setOniActive(false);
     oniActiveRef.current = false;
     setOniIntro(false);
@@ -310,15 +324,31 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
       const nextPlayer = playerPosRef.current;
 
-      if (oniActiveRef.current && oniPosRef.current && !oniChasePausedRef.current) {
-        const nextOni = moveToward(oniPosRef.current, nextPlayer, ONI_SPEED);
-        oniPosRef.current = nextOni;
-        setOniPos(nextOni);
+      if (oniActiveRef.current && !oniChasePausedRef.current) {
+        if (oniPosRef.current) {
+          const nextOni = moveToward(oniPosRef.current, nextPlayer, ONI_SPEED);
+          oniPosRef.current = nextOni;
+          setOniPos(nextOni);
 
-        if (mapDistance(nextOni, nextPlayer) < CATCH_RADIUS) {
-          setPhase('lose');
-          phaseRef.current = 'lose';
-          return;
+          if (mapDistance(nextOni, nextPlayer) < CATCH_RADIUS) {
+            setPhase('lose');
+            phaseRef.current = 'lose';
+            return;
+          }
+        }
+
+        const nextMinions = minionPosRef.current.map((pos, i) =>
+          moveToward(pos, nextPlayer, MINION_SPEEDS[i] ?? MINION_SPEEDS[0]),
+        );
+        minionPosRef.current = nextMinions;
+        setMinionPositions(nextMinions);
+
+        for (const minionPos of nextMinions) {
+          if (mapDistance(minionPos, nextPlayer) < CATCH_RADIUS) {
+            setPhase('lose');
+            phaseRef.current = 'lose';
+            return;
+          }
         }
       }
 
@@ -379,7 +409,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <li>🚩 スタートは本州・四国・九州の県庁所在地</li>
             <li>👆 アバターに触れたまま、<strong>指をスライド</strong>して歩こう</li>
             <li>🗺️ 画面は1地方くらい。歩くと地図がスクロール</li>
-            <li>👹 スタートと同時に、<strong>画面の外</strong>の別の県の県庁所在地（◎）から鬼が現れる！</li>
+            <li>👹 スタートと同時に、<strong>もんだい大王</strong>と小さい鬼3匹が画面の外から追いかけてくる！</li>
           </ul>
           <button type="button" className="btn-primary" onClick={requestStart}>たんけんスタート！</button>
         </div>
@@ -409,7 +439,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         <div className="clear-card">
           <span className="clear-emoji">👹</span>
           <h2>捕まった…</h2>
-          <p>もんだい大王に追いつかれた！</p>
+          <p>鬼に追いつかれた！</p>
           <div className="finish-actions">
             <button className="btn-primary" onClick={requestStart}>もう一度</button>
             <button className="btn-secondary" onClick={onBack}>ホームへ</button>
@@ -498,9 +528,25 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                         imageSrc={getOniSpriteSrc(oniDir, oniStep)}
                         direction={oniDir}
                         step={oniStep}
-                        className="map-char--oni"
+                        className="map-char--oni map-char--oni-boss"
                       />
                     )}
+                    {oniActive && !oniIntro && minionPositions.map((pos, i) => {
+                      const minionDir = directionFromVector(playerPos.x - pos.x, playerPos.y - pos.y);
+                      const minionStep = stepFromMotion(true, animFrame + i * 3);
+                      return (
+                        <MapCharacterSprite
+                          key={i}
+                          x={pos.x}
+                          y={pos.y}
+                          size={MINION_SIZE}
+                          imageSrc={getOniSpriteSrc(minionDir, minionStep)}
+                          direction={minionDir}
+                          step={minionStep}
+                          className="map-char--oni map-char--oni-minion"
+                        />
+                      );
+                    })}
                   </div>
                 )}
               />

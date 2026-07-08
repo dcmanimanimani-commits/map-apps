@@ -2953,8 +2953,29 @@ html.boss-no-select .scribble-kanji-input {
   z-index: 3;
 }
 
+.map-char--oni-minion {
+  z-index: 2;
+}
+
 .map-char--oni .map-char-img {
   filter: drop-shadow(0 4px 10px rgba(220, 38, 38, 0.45));
+}
+
+.map-char--oni-minion .map-char-img {
+  filter: drop-shadow(0 2px 6px rgba(220, 38, 38, 0.35));
+}
+
+.map-char--oni-minion.map-char--moving.map-char--rightFoot .map-char-img {
+  animation: map-char-walk-minion 0.38s ease-in-out infinite alternate;
+}
+
+.map-char--oni-minion.map-char--moving.map-char--leftFoot .map-char-img {
+  animation: map-char-walk-minion 0.38s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes map-char-walk-minion {
+  from { transform: translateY(0); }
+  to { transform: translateY(-5px); }
 }
 
 @keyframes map-char-walk {
