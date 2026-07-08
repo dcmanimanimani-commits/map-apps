@@ -2973,6 +2973,19 @@ html.boss-no-select .scribble-kanji-input {
   animation: map-char-walk-minion 0.38s ease-in-out infinite alternate-reverse;
 }
 
+.map-char--oni-minion.map-char--left.map-char--moving.map-char--rightFoot .map-char-img {
+  animation: map-char-walk-minion-left 0.38s ease-in-out infinite alternate;
+}
+
+.map-char--oni-minion.map-char--left.map-char--moving.map-char--leftFoot .map-char-img {
+  animation: map-char-walk-minion-left 0.38s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes map-char-walk-minion-left {
+  from { transform: scaleX(-1) translateY(0); }
+  to { transform: scaleX(-1) translateY(-5px); }
+}
+
 @keyframes map-char-walk-minion {
   from { transform: translateY(0); }
   to { transform: translateY(-5px); }
