@@ -1,4 +1,4 @@
-import { AVATAR_IMAGES, BOSS_IMAGE, type AvatarLevel } from '../data/characterAssets';
+import { AVATAR_IMAGES, BOSS_IMAGE, MINION_IMAGE, type AvatarLevel } from '../data/characterAssets';
 
 export type CharDirection = 'up' | 'right' | 'down' | 'left';
 export type CharStep = 'idle' | 'rightFoot' | 'leftFoot';
@@ -38,6 +38,10 @@ export function getAvatarSpriteSrc(level: AvatarLevel, _dir: CharDirection, _ste
 
 export function getOniSpriteSrc(_dir: CharDirection, _step: CharStep): string {
   return BOSS_IMAGE;
+}
+
+export function getMinionSpriteSrc(_dir: CharDirection, _step: CharStep): string {
+  return MINION_IMAGE;
 }
 
 export function directionFromVector(dx: number, dy: number): CharDirection {

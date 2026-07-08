@@ -2962,7 +2962,7 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .map-char--oni-minion .map-char-img {
-  filter: drop-shadow(0 2px 6px rgba(220, 38, 38, 0.35));
+  filter: drop-shadow(0 2px 6px rgba(124, 58, 237, 0.4));
 }
 
 .map-char--oni-minion.map-char--moving.map-char--rightFoot .map-char-img {

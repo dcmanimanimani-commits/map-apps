@@ -363,6 +363,118 @@ export function pickMultipleOniSpawns(
   return spawns;
 }
 
+type SpawnSector = 'north' | 'east' | 'south' | 'west';
+
+function sectorOfPoint(player: MapPoint, pos: MapPoint): SpawnSector {
+  const dx = pos.x - player.x;
+  const dy = pos.y - player.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'east' : 'west';
+  return dy >= 0 ? 'south' : 'north';
+}
+
+function shuffleSectors(): SpawnSector[] {
+  const sectors: SpawnSector[] = ['north', 'east', 'south', 'west'];
+  for (let i = sectors.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [sectors[i], sectors[j]] = [sectors[j], sectors[i]];
+  }
+  return sectors;
+}
+
+function jitterSpawn(pos: MapPoint, worldW: number, worldH: number, seed: number): MapPoint {
+  const angle = seed * 2.399963;
+  const radius = 18 + (seed % 5) * 7;
+  return clampToMap(
+    {
+      x: pos.x + Math.cos(angle) * radius,
+      y: pos.y + Math.sin(angle) * radius,
+    },
+    worldW,
+    worldH,
+    20,
+  );
+}
+
+function pickOniSpawnInSector(
+  player: MapPoint,
+  sector: SpawnSector,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  viewW: number,
+  viewH: number,
+  capitals: Map<string, MapPoint>,
+  excluded: MapPoint[],
+  minGap: number,
+): MapPoint {
+  const candidates = collectOniSpawnCandidates(
+    player,
+    geo,
+    worldW,
+    worldH,
+    viewW,
+    viewH,
+    capitals,
+    excluded,
+    minGap,
+  ).filter((pos) => sectorOfPoint(player, pos) === sector);
+
+  if (candidates.length > 0) {
+    const pick = candidates[Math.floor(Math.random() * Math.min(5, candidates.length))];
+    return jitterSpawn(pick, worldW, worldH, excluded.length * 3 + sector.length);
+  }
+
+  return jitterSpawn(
+    pickOniSpawnAtEdgeCapital(player, geo, worldW, worldH, viewW, viewH, capitals, excluded),
+    worldW,
+    worldH,
+    excluded.length * 5,
+  );
+}
+
+/** 大王1体と小さい鬼を、方角ばらけの場所から出現させる */
+export function pickBossAndMinionSpawns(
+  minionCount: number,
+  player: MapPoint,
+  geo: JapanGeoJSON,
+  worldW: number,
+  worldH: number,
+  viewW: number,
+  viewH: number,
+  capitals: Map<string, MapPoint>,
+): { boss: MapPoint; minions: MapPoint[] } {
+  const minGap = Math.min(worldW, worldH) * 0.2;
+  const boss = jitterSpawn(
+    pickOniSpawnAtEdgeCapital(player, geo, worldW, worldH, viewW, viewH, capitals, []),
+    worldW,
+    worldH,
+    0,
+  );
+  const excluded: MapPoint[] = [boss];
+  const minions: MapPoint[] = [];
+  const sectors = shuffleSectors();
+
+  for (let i = 0; i < minionCount; i++) {
+    const sector = sectors[i % sectors.length];
+    const spawn = pickOniSpawnInSector(
+      player,
+      sector,
+      geo,
+      worldW,
+      worldH,
+      viewW,
+      viewH,
+      capitals,
+      excluded,
+      minGap,
+    );
+    minions.push(spawn);
+    excluded.push(spawn);
+  }
+
+  return { boss, minions };
+}
+
 export function mapDistance(a: MapPoint, b: MapPoint): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }

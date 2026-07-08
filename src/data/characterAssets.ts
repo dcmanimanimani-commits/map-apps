@@ -13,3 +13,4 @@ export const AVATAR_IMAGES: Record<AvatarLevel, string> = {
 };
 
 export const BOSS_IMAGE = '/characters/boss-daiou.webp';
+export const MINION_IMAGE = '/characters/oni-minion.svg';

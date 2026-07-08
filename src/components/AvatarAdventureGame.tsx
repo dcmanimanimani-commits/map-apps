@@ -14,12 +14,13 @@ import {
   getCamera,
   mapDistance,
   moveToward,
-  pickMultipleOniSpawns,
+  pickBossAndMinionSpawns,
   type MapPoint,
 } from '../utils/mapPositions';
 import {
   directionFromVector,
   getAvatarFallbackSrc,
+  getMinionSpriteSrc,
   getOniSpriteSrc,
   type CharDirection,
   type CharStep,
@@ -157,8 +158,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const { width: vw, height: vh } = viewSizeRef.current;
     if (ww < 200 || capitalsRef.current.size === 0) return;
 
-    const spawns = pickMultipleOniSpawns(
-      MINION_COUNT + 1,
+    const { boss: bossSpawn, minions: minionSpawns } = pickBossAndMinionSpawns(
+      MINION_COUNT,
       playerPosRef.current,
       geoRef.current,
       ww,
@@ -167,8 +168,6 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       vh,
       capitalsRef.current,
     );
-    const bossSpawn = spawns[0];
-    const minionSpawns = spawns.slice(1);
     setOniPos(bossSpawn);
     oniPosRef.current = bossSpawn;
     setMinionPositions(minionSpawns);
@@ -540,7 +539,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                           x={pos.x}
                           y={pos.y}
                           size={MINION_SIZE}
-                          imageSrc={getOniSpriteSrc(minionDir, minionStep)}
+                          imageSrc={getMinionSpriteSrc(minionDir, minionStep)}
                           direction={minionDir}
                           step={minionStep}
                           className="map-char--oni map-char--oni-minion"
