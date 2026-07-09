@@ -264,7 +264,7 @@ export function JapanMap({
 
   const mainlandTransform = useMemo(() => {
     if (!isFocused || mainlandPaths.length === 0) return '';
-    if (regionFocusReserveOkinawaInset || (includesOkinawa && hasMainlandFocus)) return '';
+    if (includesOkinawa && hasMainlandFocus) return '';
 
     let weightedX = 0;
     let weightedY = 0;
@@ -290,7 +290,6 @@ export function JapanMap({
     mainlandPaths,
     width,
     height,
-    regionFocusReserveOkinawaInset,
     includesOkinawa,
     hasMainlandFocus,
   ]);
