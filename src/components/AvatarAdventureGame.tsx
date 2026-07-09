@@ -77,6 +77,10 @@ function pickStartAndGoal(capitals: Map<string, MapPoint>): {
   };
 }
 
+function goalRegionLabel(region: string): string {
+  return region === '北海道' ? '北海道' : `${region}地方`;
+}
+
 function stepFromMotion(moving: boolean, frame: number): CharStep {
   if (!moving) return 'idle';
   return frame % 2 === 0 ? 'rightFoot' : 'leftFoot';
@@ -520,12 +524,25 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       <PlayerStatus />
 
       <div className="adventure-hud">
-        <div className="adventure-goal-banner">
-          <span className="adventure-goal-eyebrow">もくてきち</span>
-          <p className="adventure-goal-main">
-            <span className="adventure-goal-kanji">{goalPref?.kanji}</span>
-            <span className="adventure-goal-tail">の県庁所在地 ◎ へ！</span>
-          </p>
+        <div
+          className={`adventure-goal-banner${
+            playIntro === 'goal-reveal' ? ' adventure-goal-banner--reveal' : ''
+          }`}
+        >
+          <span className="adventure-goal-eyebrow">
+            {playIntro === 'goal-reveal' ? '目的地はここ！' : 'もくてきち'}
+          </span>
+          <div className="adventure-goal-title-wrap">
+            {goalPref && (
+              <span className="adventure-goal-region-bg" aria-hidden>
+                {goalRegionLabel(goalPref.region)}
+              </span>
+            )}
+            <p className="adventure-goal-main">
+              <span className="adventure-goal-kanji">{goalPref?.kanji}</span>
+              <span className="adventure-goal-tail">の県庁所在地 ◎ へ！</span>
+            </p>
+          </div>
           {goalPref && (
             <p className="adventure-goal-hiragana">（{goalPref.hiragana}）</p>
           )}
@@ -622,13 +639,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           {playIntro === 'playing' && (
             <p className="adventure-touch-hint">👆 アバターをつかんでスライド</p>
           )}
-          {playIntro === 'goal-reveal' && goalPref && (
-            <div className="adventure-goal-reveal-splash" role="status" aria-live="assertive">
-              <p className="adventure-goal-reveal-eyebrow">目的地はここ！</p>
-              <p className="adventure-goal-reveal-main">{goalPref.kanji}</p>
-              <p className="adventure-goal-reveal-region">（{goalPref.region}地方）</p>
-              <p className="adventure-goal-reveal-sub">県庁所在地 ◎ へたどり着け！</p>
-            </div>
+          {playIntro === 'goal-reveal' && (
+            <div className="adventure-goal-reveal-dim" aria-hidden />
           )}
           {playIntro === 'oni-reveal' && (
             <div className="adventure-oni-splash" role="status" aria-live="assertive">

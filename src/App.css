@@ -2682,6 +2682,47 @@ html.boss-no-select .scribble-kanji-input {
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 55%, #fcd34d 100%);
   border: 2px solid #f59e0b;
   box-shadow: 0 3px 10px rgba(245, 158, 11, 0.25);
+  overflow: hidden;
+}
+
+.adventure-goal-banner--reveal {
+  animation: adventure-goal-banner-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes adventure-goal-banner-pulse {
+  from {
+    box-shadow: 0 3px 10px rgba(245, 158, 11, 0.25);
+    border-color: #f59e0b;
+  }
+  to {
+    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.45);
+    border-color: #d97706;
+  }
+}
+
+.adventure-goal-title-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(2.8rem, 11vw, 3.6rem);
+  margin: 0.1rem 0;
+}
+
+.adventure-goal-region-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.6rem, 7.5vw, 2.6rem);
+  font-weight: 900;
+  color: rgba(180, 83, 9, 0.2);
+  letter-spacing: 0.05em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
 }
 
 .adventure-goal-eyebrow {
@@ -2694,8 +2735,12 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .adventure-goal-main {
+  position: relative;
+  z-index: 1;
   margin: 0;
   line-height: 1.25;
+  text-align: center;
+  width: 100%;
 }
 
 .adventure-goal-kanji {
@@ -2844,59 +2889,12 @@ html.boss-no-select .scribble-kanji-input {
   }
 }
 
-.adventure-goal-reveal-splash {
+.adventure-goal-reveal-dim {
   position: absolute;
   inset: 0;
-  z-index: 12;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 1rem;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.42) 100%);
+  z-index: 8;
+  background: rgba(15, 23, 42, 0.18);
   pointer-events: none;
-  animation: adventure-oni-splash-in 0.3s ease-out;
-}
-
-.adventure-goal-reveal-eyebrow {
-  margin: 0;
-  font-size: clamp(1rem, 4.5vw, 1.35rem);
-  font-weight: 900;
-  color: #fff;
-  letter-spacing: 0.08em;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-}
-
-.adventure-goal-reveal-main {
-  margin: 0;
-  font-size: clamp(2rem, 9vw, 3rem);
-  font-weight: 900;
-  color: #fff;
-  line-height: 1.1;
-  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
-  animation: adventure-goal-reveal-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.adventure-goal-reveal-region {
-  margin: 0;
-  font-size: clamp(1.1rem, 5vw, 1.55rem);
-  font-weight: 800;
-  color: #fde68a;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-}
-
-.adventure-goal-reveal-sub {
-  margin: 0.35rem 0 0;
-  font-size: clamp(0.9rem, 3.8vw, 1.05rem);
-  font-weight: 800;
-  color: #fff;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-@keyframes adventure-goal-reveal-pop {
-  from { transform: scale(0.82); opacity: 0.2; }
-  to { transform: scale(1); opacity: 1; }
 }
 
 .adventure-oni-splash {
