@@ -37,6 +37,8 @@ interface JapanMapProps {
   fixedSize?: { width: number; height: number };
   /** 地方ズーム時の海まわり余白（小さいほど陸地が大きく） */
   regionFocusPadding?: number;
+  /** 九州＋沖縄のように本州側と沖縄インセットを両方表示するとき */
+  regionFocusReserveOkinawaInset?: boolean;
   renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
@@ -52,6 +54,7 @@ export function JapanMap({
   interactive = true,
   fixedSize,
   regionFocusPadding = 20,
+  regionFocusReserveOkinawaInset = false,
   renderOverlay,
 }: JapanMapProps) {
   const mapInstanceId = useId().replace(/:/g, '');
@@ -97,7 +100,13 @@ export function JapanMap({
     if (source.features.length === 0) return [];
 
     const pathGen = isFocused
-      ? createRegionFocusPathGenerator(visibleMainland, width, height, regionFocusPadding)
+      ? createRegionFocusPathGenerator(
+        visibleMainland,
+        width,
+        height,
+        regionFocusPadding,
+        regionFocusReserveOkinawaInset || (includesOkinawa && hasMainlandFocus),
+      )
       : createMainlandPathGenerator(mainland, width, height);
 
     return source.features.map((feature) => {
@@ -112,7 +121,18 @@ export function JapanMap({
         feature: feature as Feature<Geometry, GeoJsonProperties>,
       };
     });
-  }, [showOkinawaFull, isFocused, visibleMainland, mainland, width, height, regionFocusPadding]);
+  }, [
+    showOkinawaFull,
+    isFocused,
+    visibleMainland,
+    mainland,
+    width,
+    height,
+    regionFocusPadding,
+    regionFocusReserveOkinawaInset,
+    includesOkinawa,
+    hasMainlandFocus,
+  ]);
 
   const okinawaFullPath = useMemo(() => {
     if (!showOkinawaFull || !okinawa) return null;
@@ -128,8 +148,9 @@ export function JapanMap({
     if (!showOkinawaInset || !okinawa) return null;
     const layout = getOkinawaInsetLayout(width, height);
     const simplified = simplifyOkinawaForInset(okinawa);
-    const insetScale =
-      includesOkinawa && hasMainlandFocus ? OKINAWA_INSET_SCALE_REGION : OKINAWA_INSET_SCALE_FULL;
+    const insetScale = includesOkinawa && hasMainlandFocus
+      ? (isFocused && regionFocusPadding <= 12 ? 0.5 : OKINAWA_INSET_SCALE_REGION)
+      : OKINAWA_INSET_SCALE_FULL;
     const pathGen = createOkinawaInsetPathGenerator(okinawa, layout, width, height, insetScale);
     return {
       d: pathGen(simplified) ?? null,
@@ -137,7 +158,7 @@ export function JapanMap({
       pathGen,
       simplified,
     };
-  }, [showOkinawaInset, okinawa, width, height, includesOkinawa, hasMainlandFocus]);
+  }, [showOkinawaInset, okinawa, width, height, includesOkinawa, hasMainlandFocus, isFocused, regionFocusPadding]);
 
   interface MapLabel {
     kanji: string;

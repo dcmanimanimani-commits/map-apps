@@ -344,7 +344,8 @@ export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
               highlightedKanji={target.kanji}
               focusKanjiSet={regionKanjiSet}
               showPrefectureLabels
-              regionFocusPadding={4}
+              regionFocusPadding={10}
+              regionFocusReserveOkinawaInset
               interactive={false}
             />
           </div>

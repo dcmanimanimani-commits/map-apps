@@ -1303,11 +1303,6 @@
   overflow: hidden;
 }
 
-.kanji-write-region-map .japan-map-wrapper.region-focus .japan-map {
-  transform: scale(1.08);
-  transform-origin: center center;
-}
-
 .kanji-write-map-hint {
   margin: 0;
   text-align: center;
