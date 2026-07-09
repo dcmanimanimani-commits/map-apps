@@ -11,13 +11,13 @@ import {
 /** 地方ズーム時に陸地が枠の何割を占めるか（大きいほど海が少ない） */
 export const REGION_LAND_FILL = 1;
 
-/** 地方ラベル中央の垂線と地図（海）エリア中央の交点（正規化 0–1） */
+/** 青い地図表示領域の見た目中心に合わせる共通補正 */
 export interface RegionLandAnchor {
   x: number;
   y: number;
 }
 
-export const REGION_LAND_ANCHOR_DEFAULT: RegionLandAnchor = { x: 0.5, y: 0.5 };
+export const REGION_LAND_ANCHOR_DEFAULT: RegionLandAnchor = { x: 0.53, y: 0.52 };
 
 export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';

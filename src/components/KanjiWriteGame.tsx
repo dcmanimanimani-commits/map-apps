@@ -345,7 +345,6 @@ export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
               focusKanjiSet={regionKanjiSet}
               showPrefectureLabels
               regionFocusPadding={1}
-              regionFocusLandAnchor={{ x: 0.5, y: 0.5 }}
               regionFocusReserveOkinawaInset
               interactive={false}
             />
