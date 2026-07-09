@@ -9,7 +9,7 @@ import {
 } from './geoTransform';
 
 /** 地方ズーム時に陸地が枠の何割を占めるか（大きいほど海が少ない） */
-export const REGION_LAND_FILL = 0.97;
+export const REGION_LAND_FILL = 0.99;
 
 export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';
@@ -18,24 +18,48 @@ export const OKINAWA_CLIP_ID = 'okinawa-clip';
 type GeoPath = ReturnType<typeof geoPath>;
 type GeoProjection = ReturnType<typeof geoMercator>;
 
+interface RegionFitBox {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  targetX: number;
+  targetY: number;
+}
+
 function getFitBox(
   width: number,
   height: number,
   padding: number,
   reserveOkinawaInset: boolean,
-): { x1: number; y1: number; x2: number; y2: number } {
-  let x1 = padding;
-  let y1 = padding;
-  let x2 = width - padding;
-  let y2 = height - padding;
+): RegionFitBox {
+  const x1 = padding;
+  const y1 = padding;
+  const x2 = width - padding;
+  const y2 = height - padding;
 
   if (reserveOkinawaInset) {
     const corner = getOkinawaCorner(width, height);
-    x2 = Math.max(x1 + 56, corner.x - padding);
-    y2 = Math.max(y1 + 56, corner.y - padding);
+    const insetX2 = Math.max(x1 + 56, corner.x - padding);
+    const insetY2 = Math.max(y1 + 56, corner.y - padding);
+    return {
+      x1,
+      y1,
+      x2: insetX2,
+      y2: insetY2,
+      targetX: (x1 + insetX2) / 2,
+      targetY: (y1 + insetY2) / 2,
+    };
   }
 
-  return { x1, y1, x2, y2 };
+  return {
+    x1,
+    y1,
+    x2,
+    y2,
+    targetX: width / 2,
+    targetY: height / 2,
+  };
 }
 
 function measureLandBounds(path: GeoPath, fitGeo: JapanGeoJSON): [[number, number], [number, number]] | null {
@@ -56,52 +80,54 @@ function measureLandBounds(path: GeoPath, fitGeo: JapanGeoJSON): [[number, numbe
   return [[minX, minY], [maxX, maxY]];
 }
 
+function centerLandAt(
+  projection: GeoProjection,
+  fitGeo: JapanGeoJSON,
+  targetX: number,
+  targetY: number,
+): GeoPath {
+  const path = geoPath(projection);
+  const bounds = measureLandBounds(path, fitGeo);
+  if (!bounds) return path;
+
+  const [[minX, minY], [maxX, maxY]] = bounds;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const [tx, ty] = projection.translate();
+  projection.translate([tx + targetX - cx, ty + targetY - cy]);
+  return geoPath(projection);
+}
+
 /** 陸地の描画範囲をそろえ、枠内に収まるよう拡大・縮小する */
 function normalizeRegionLandFit(
   projection: GeoProjection,
   fitGeo: JapanGeoJSON,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
+  fitBox: RegionFitBox,
   fill = REGION_LAND_FILL,
 ): GeoPath {
-  const targetX = (x1 + x2) / 2;
-  const targetY = (y1 + y2) / 2;
+  const { x1, y1, x2, y2, targetX, targetY } = fitBox;
   const boxW = x2 - x1;
   const boxH = y2 - y1;
 
-  let path = geoPath(projection);
+  let path = centerLandAt(projection, fitGeo, targetX, targetY);
   let bounds = measureLandBounds(path, fitGeo);
   if (!bounds) return path;
 
   let [[minX, minY], [maxX, maxY]] = bounds;
-  let cx = (minX + maxX) / 2;
-  let cy = (minY + maxY) / 2;
-  let [tx, ty] = projection.translate();
-  projection.translate([tx + targetX - cx, ty + targetY - cy]);
-
-  path = geoPath(projection);
-  bounds = measureLandBounds(path, fitGeo);
-  if (!bounds) return path;
-
-  [[minX, minY], [maxX, maxY]] = bounds;
   const landW = Math.max(1, maxX - minX);
   const landH = Math.max(1, maxY - minY);
   const scaleFactor = Math.min((boxW * fill) / landW, (boxH * fill) / landH);
-  if (!isFinite(scaleFactor) || scaleFactor <= 0 || Math.abs(scaleFactor - 1) < 0.005) {
-    return path;
+  if (isFinite(scaleFactor) && scaleFactor > 0 && Math.abs(scaleFactor - 1) >= 0.005) {
+    const [tx, ty] = projection.translate();
+    const scale = projection.scale();
+    projection.scale(scale * scaleFactor);
+    projection.translate([
+      targetX + scaleFactor * (tx - targetX),
+      targetY + scaleFactor * (ty - targetY),
+    ]);
   }
 
-  [tx, ty] = projection.translate();
-  const scale = projection.scale();
-  projection.scale(scale * scaleFactor);
-  projection.translate([
-    targetX + scaleFactor * (tx - targetX),
-    targetY + scaleFactor * (ty - targetY),
-  ]);
-
-  return geoPath(projection);
+  return centerLandAt(projection, fitGeo, targetX, targetY);
 }
 
 /** L字区切りの角（画面右下の沖縄エリア） */
@@ -142,14 +168,14 @@ export function createRegionFocusPathGenerator(
   reserveOkinawaInset = false,
 ): GeoPath {
   const fitGeo = trimForRegionFocus(regionGeo);
-  const { x1, y1, x2, y2 } = getFitBox(width, height, padding, reserveOkinawaInset);
+  const fitBox = getFitBox(width, height, padding, reserveOkinawaInset);
 
   const projection = geoMercator().fitExtent(
-    [[x1, y1], [x2, y2]],
+    [[fitBox.x1, fitBox.y1], [fitBox.x2, fitBox.y2]],
     fitGeo,
   );
 
-  return normalizeRegionLandFit(projection, fitGeo, x1, y1, x2, y2, REGION_LAND_FILL);
+  return normalizeRegionLandFit(projection, fitGeo, fitBox, REGION_LAND_FILL);
 }
 
 /** 沖縄のみ表示：画面いっぱいにフィット */

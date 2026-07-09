@@ -58,7 +58,7 @@ export function JapanMap({
   onPrefectureClick,
   interactive = true,
   fixedSize,
-  regionFocusPadding = 20,
+  regionFocusPadding = 6,
   regionFocusReserveOkinawaInset = false,
   renderOverlay,
 }: JapanMapProps) {
