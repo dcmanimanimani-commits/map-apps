@@ -35,12 +35,14 @@ interface AvatarAdventureGameProps {
 }
 
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
+type PlayIntro = 'goal-reveal' | 'oni-reveal' | 'playing';
 
 const ONI_SPEED = 5.625;
 const MINION_COUNT = 3;
 /** 小さい鬼は大王よりゆっくり（とことこ） */
 const MINION_SPEEDS = [3.0, 3.25, 3.5] as const;
 const ONI_INTRO_MS = 1000;
+const GOAL_REVEAL_MS = 2800;
 const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 152;
@@ -101,6 +103,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [minionPositions, setMinionPositions] = useState<MapPoint[]>([]);
   const [oniActive, setOniActive] = useState(false);
   const [oniIntro, setOniIntro] = useState(false);
+  const [playIntro, setPlayIntro] = useState<PlayIntro>('playing');
+  const [cinematicCamera, setCinematicCamera] = useState<MapPoint>({ x: 0, y: 0 });
   const [animFrame, setAnimFrame] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
 
@@ -116,6 +120,9 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const minionPosRef = useRef<MapPoint[]>([]);
   const oniActiveRef = useRef(false);
   const oniChasePausedRef = useRef(false);
+  const playIntroRef = useRef<PlayIntro>('playing');
+  const cinematicCameraRef = useRef<MapPoint>({ x: 0, y: 0 });
+  const cinematicTargetRef = useRef<MapPoint>({ x: 0, y: 0 });
   const goalPosRef = useRef<MapPoint>({ x: 0, y: 0 });
   const phaseRef = useRef<Phase>('pick-avatar');
   const lastDirRef = useRef<CharDirection>('down');
@@ -127,6 +134,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   oniPosRef.current = oniPos;
   minionPosRef.current = minionPositions;
   oniActiveRef.current = oniActive;
+  playIntroRef.current = playIntro;
   phaseRef.current = phase;
   worldSizeRef.current = worldSize;
   viewSizeRef.current = { width: viewW, height: viewH };
@@ -144,16 +152,27 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     return Math.round(Math.max(24, Math.min(42, viewW * 0.058)) * 0.8);
   }, [viewW]);
 
-  const camera = useMemo(
-    () => getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height),
-    [playerPos, viewW, viewH, worldSize.width, worldSize.height],
-  );
+  const displayCamera = useMemo(() => {
+    if (playIntro === 'playing') {
+      return getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height);
+    }
+    return cinematicCamera;
+  }, [playIntro, playerPos, cinematicCamera, viewW, viewH, worldSize.width, worldSize.height]);
+
+  const getActiveCamera = useCallback(() => {
+    if (playIntroRef.current === 'playing') {
+      const { width: vw, height: vh } = viewSizeRef.current;
+      const { width: ww, height: wh } = worldSizeRef.current;
+      return getCamera(playerPosRef.current, vw, vh, ww, wh);
+    }
+    return cinematicCameraRef.current;
+  }, []);
 
   worldSizeRef.current = worldSize;
   viewSizeRef.current = { width: viewW, height: viewH };
   geoRef.current = geo;
 
-  const spawnOni = useCallback(() => {
+  const prepareOniSpawns = useCallback(() => {
     const { width: ww, height: wh } = worldSizeRef.current;
     const { width: vw, height: vh } = viewSizeRef.current;
     if (ww < 200 || capitalsRef.current.size === 0) return;
@@ -174,12 +193,12 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     minionPosRef.current = minionSpawns;
     setOniActive(true);
     oniActiveRef.current = true;
-    setOniIntro(true);
-    oniChasePausedRef.current = true;
   }, []);
 
   const initRound = useCallback(() => {
     const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(capitals);
+    const { width: vw, height: vh } = viewSizeRef.current;
+    const { width: ww, height: wh } = worldSizeRef.current;
     setStartPref(start);
     setGoalPref(goal);
     goalPosRef.current = goalSpot;
@@ -192,7 +211,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setOniActive(false);
     oniActiveRef.current = false;
     setOniIntro(false);
-    oniChasePausedRef.current = false;
+    oniChasePausedRef.current = true;
     setAnimFrame(0);
     setIsMoving(false);
     pointerRef.current = {
@@ -202,8 +221,15 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       grabOffsetX: 0,
       grabOffsetY: 0,
     };
-    spawnOni();
-  }, [capitals, spawnOni]);
+
+    const startCam = getCamera(startPos, vw, vh, ww, wh);
+    const goalCam = getCamera(goalSpot, vw, vh, ww, wh);
+    cinematicCameraRef.current = startCam;
+    cinematicTargetRef.current = goalCam;
+    setCinematicCamera(startCam);
+    setPlayIntro('goal-reveal');
+    playIntroRef.current = 'goal-reveal';
+  }, [capitals]);
 
   const applyPointerToPlayer = useCallback(() => {
     const ptr = pointerRef.current;
@@ -213,9 +239,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     if (!el) return false;
 
     const rect = el.getBoundingClientRect();
-    const { width: vw, height: vh } = viewSizeRef.current;
     const { width: ww, height: wh } = worldSizeRef.current;
-    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
+    const cam = getActiveCamera();
     const touch = clientToWorld(ptr.clientX, ptr.clientY, rect, cam);
     const before = playerPosRef.current;
     const targetX = touch.x - ptr.grabOffsetX;
@@ -239,17 +264,15 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     }
     setIsMoving(true);
     return true;
-  }, []);
+  }, [getActiveCamera]);
 
   const worldPointFromClient = useCallback((clientX: number, clientY: number) => {
     const el = viewportRef.current;
     if (!el) return null;
     const rect = el.getBoundingClientRect();
-    const { width: vw, height: vh } = viewSizeRef.current;
-    const { width: ww, height: wh } = worldSizeRef.current;
-    const cam = getCamera(playerPosRef.current, vw, vh, ww, wh);
+    const cam = getActiveCamera();
     return clientToWorld(clientX, clientY, rect, cam);
-  }, []);
+  }, [getActiveCamera]);
 
   const requestStart = useCallback(() => {
     setPhase('play');
@@ -266,7 +289,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   applyPointerRef.current = applyPointerToPlayer;
 
   const handlePlayerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (phaseRef.current !== 'play') return;
+    if (phaseRef.current !== 'play' || playIntroRef.current !== 'playing') return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -300,13 +323,52 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, []);
 
   useEffect(() => {
-    if (!oniIntro || phase !== 'play') return;
-    const introClearTimer = window.setTimeout(() => {
+    if (playIntro !== 'goal-reveal' || phase !== 'play') return;
+    const goalRevealTimer = window.setTimeout(() => {
+      prepareOniSpawns();
+      const { width: vw, height: vh } = viewSizeRef.current;
+      const { width: ww, height: wh } = worldSizeRef.current;
+      cinematicTargetRef.current = getCamera(playerPosRef.current, vw, vh, ww, wh);
+      setPlayIntro('oni-reveal');
+      playIntroRef.current = 'oni-reveal';
+      setOniIntro(true);
+      oniChasePausedRef.current = true;
+    }, GOAL_REVEAL_MS);
+    return () => clearTimeout(goalRevealTimer);
+  }, [playIntro, phase, prepareOniSpawns]);
+
+  useEffect(() => {
+    if (playIntro !== 'oni-reveal' || phase !== 'play') return;
+    const oniRevealTimer = window.setTimeout(() => {
       setOniIntro(false);
+      setPlayIntro('playing');
+      playIntroRef.current = 'playing';
       oniChasePausedRef.current = false;
     }, ONI_INTRO_MS);
-    return () => clearTimeout(introClearTimer);
-  }, [oniIntro, phase]);
+    return () => clearTimeout(oniRevealTimer);
+  }, [playIntro, phase]);
+
+  useEffect(() => {
+    if (playIntro === 'playing' || phase !== 'play') return;
+
+    let raf = 0;
+    const tick = () => {
+      if (playIntroRef.current === 'playing' || phaseRef.current !== 'play') return;
+
+      const cur = cinematicCameraRef.current;
+      const tgt = cinematicTargetRef.current;
+      const next = {
+        x: cur.x + (tgt.x - cur.x) * 0.1,
+        y: cur.y + (tgt.y - cur.y) * 0.1,
+      };
+      cinematicCameraRef.current = next;
+      setCinematicCamera(next);
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playIntro, phase]);
 
   useEffect(() => {
     if (phase !== 'play' || worldSize.width < 200) return;
@@ -468,7 +530,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
             <p className="adventure-goal-hiragana">（{goalPref.hiragana}）</p>
           )}
         </div>
-        {oniActive && !oniIntro && <p className="adventure-warning">👹 にげろ！</p>}
+        {oniActive && !oniIntro && playIntro === 'playing' && <p className="adventure-warning">👹 にげろ！</p>}
       </div>
 
       <div className="adventure-play-area">
@@ -485,7 +547,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
               style={{
                 width: worldSize.width,
                 height: worldSize.height,
-                transform: `translate(${-camera.x}px, ${-camera.y}px)`,
+                transform: `translate(${-displayCamera.x}px, ${-displayCamera.y}px)`,
               }}
             >
               <JapanMap
@@ -501,13 +563,18 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                     {Array.from(capitals.entries()).map(([kanji, pos]) => (
                       <div
                         key={kanji}
-                        className="adventure-capital-marker"
+                        className={`adventure-capital-marker${
+                          playIntro === 'goal-reveal' && kanji === goalPref?.kanji
+                            ? ' adventure-capital-marker--goal'
+                            : ''
+                        }`}
                         style={{ left: pos.x, top: pos.y, fontSize: capitalMarkerSize }}
                         aria-hidden
                       >
                         ◎
                       </div>
                     ))}
+                    {playIntro !== 'goal-reveal' && (
                     <MapCharacterSprite
                       x={playerPos.x}
                       y={playerPos.y}
@@ -516,9 +583,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       direction="down"
                       step={playerStep}
                       className="map-char--player"
-                      interactive
+                      interactive={playIntro === 'playing'}
                       onPointerDown={handlePlayerPointerDown}
                     />
+                    )}
                     {oniActive && oniPos && !oniIntro && (
                       <MapCharacterSprite
                         x={oniPos.x}
@@ -551,8 +619,18 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
               />
             </div>
           )}
-          <p className="adventure-touch-hint">👆 アバターをつかんでスライド</p>
-          {oniIntro && (
+          {playIntro === 'playing' && (
+            <p className="adventure-touch-hint">👆 アバターをつかんでスライド</p>
+          )}
+          {playIntro === 'goal-reveal' && goalPref && (
+            <div className="adventure-goal-reveal-splash" role="status" aria-live="assertive">
+              <p className="adventure-goal-reveal-eyebrow">目的地はここ！</p>
+              <p className="adventure-goal-reveal-main">{goalPref.kanji}</p>
+              <p className="adventure-goal-reveal-region">（{goalPref.region}地方）</p>
+              <p className="adventure-goal-reveal-sub">県庁所在地 ◎ へたどり着け！</p>
+            </div>
+          )}
+          {playIntro === 'oni-reveal' && (
             <div className="adventure-oni-splash" role="status" aria-live="assertive">
               <img src={BOSS_IMAGE} alt="" className="adventure-oni-splash-img" />
               <p className="adventure-oni-splash-text">鬼登場！逃げろ！</p>
@@ -561,7 +639,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         </div>
       </div>
 
-      {startPref && (
+      {startPref && playIntro === 'playing' && (
         <p className="adventure-start-hint">スタート：{startPref.kanji}の県庁所在地</p>
       )}
     </div>
