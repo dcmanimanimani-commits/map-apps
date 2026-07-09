@@ -89,25 +89,6 @@ function measureLandBounds(path: GeoPath, fitGeo: JapanGeoJSON): [[number, numbe
   return [[minX, minY], [maxX, maxY]];
 }
 
-function measureLandVisualCenter(path: GeoPath, fitGeo: JapanGeoJSON): [number, number] | null {
-  let weightedX = 0;
-  let weightedY = 0;
-  let totalArea = 0;
-
-  for (const feature of fitGeo.features) {
-    const geoFeature = feature as Feature<Geometry, GeoJsonProperties>;
-    const area = path.area(geoFeature);
-    const [cx, cy] = path.centroid(geoFeature);
-    if (!isFinite(area) || area <= 0 || !isFinite(cx) || !isFinite(cy)) continue;
-    weightedX += cx * area;
-    weightedY += cy * area;
-    totalArea += area;
-  }
-
-  if (totalArea <= 0) return null;
-  return [weightedX / totalArea, weightedY / totalArea];
-}
-
 function centerLandAt(
   projection: GeoProjection,
   fitGeo: JapanGeoJSON,
@@ -115,10 +96,12 @@ function centerLandAt(
   targetY: number,
 ): GeoPath {
   const path = geoPath(projection);
-  const center = measureLandVisualCenter(path, fitGeo);
-  if (!center) return path;
+  const bounds = measureLandBounds(path, fitGeo);
+  if (!bounds) return path;
 
-  const [cx, cy] = center;
+  const [[minX, minY], [maxX, maxY]] = bounds;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
   const [tx, ty] = projection.translate();
   projection.translate([tx + targetX - cx, ty + targetY - cy]);
   return geoPath(projection);
