@@ -2677,7 +2677,7 @@ html.boss-no-select .scribble-kanji-input {
 .adventure-goal-banner {
   flex: 1 1 100%;
   margin: 0;
-  padding: 0.65rem 0.85rem;
+  padding: 0.75rem 0.95rem;
   border-radius: 12px;
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 55%, #fcd34d 100%);
   border: 2px solid #f59e0b;
@@ -2703,29 +2703,8 @@ html.boss-no-select .scribble-kanji-input {
 .adventure-goal-title-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 0.2rem;
-  margin: 0.15rem 0 0.05rem;
-  padding: 0 0.25rem;
-}
-
-.adventure-goal-region-bg {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding-left: 0.15rem;
-  font-size: clamp(1rem, 4.2vw, 1.35rem);
-  font-weight: 900;
-  color: rgba(146, 64, 14, 0.72);
-  letter-spacing: 0.07em;
-  line-height: 1;
-  white-space: nowrap;
-  pointer-events: none;
-  user-select: none;
-}
-
-.adventure-goal-banner--reveal .adventure-goal-region-bg {
-  color: rgba(180, 83, 9, 0.88);
+  margin: 0.1rem 0 0;
 }
 
 .adventure-goal-eyebrow {
@@ -2738,13 +2717,34 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .adventure-goal-main {
-  position: relative;
-  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
   margin: 0;
-  line-height: 1.25;
-  text-align: right;
+  line-height: 1.15;
   width: 100%;
-  padding-right: 0.15rem;
+}
+
+.adventure-goal-destination {
+  font-size: clamp(1.9rem, 7.5vw, 2.75rem);
+  font-weight: 900;
+  color: #1e3a5f;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.adventure-goal-banner--reveal .adventure-goal-destination {
+  color: #0f172a;
+}
+
+.adventure-goal-region {
+  font-size: clamp(1.15rem, 4.8vw, 1.65rem);
+  font-weight: 800;
+  color: #92400e;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .adventure-goal-kanji {
@@ -2764,8 +2764,8 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .adventure-goal-hiragana {
-  margin: 0.25rem 0 0;
-  font-size: clamp(0.82rem, 3vw, 0.95rem);
+  margin: 0;
+  font-size: clamp(0.88rem, 3.2vw, 1rem);
   font-weight: 700;
   color: #78350f;
 }

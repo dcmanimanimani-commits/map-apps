@@ -534,18 +534,15 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           </span>
           <div className="adventure-goal-title-wrap">
             {goalPref && (
-              <span className="adventure-goal-region-bg" aria-hidden>
-                {goalRegionLabel(goalPref.region)}
-              </span>
+              <p className="adventure-goal-main">
+                <span className="adventure-goal-destination">{goalPref.kanji}へ</span>
+                <span className="adventure-goal-region">（{goalRegionLabel(goalPref.region)}）</span>
+              </p>
             )}
-            <p className="adventure-goal-main">
-              <span className="adventure-goal-kanji">{goalPref?.kanji}</span>
-              <span className="adventure-goal-tail">の県庁所在地 ◎ へ！</span>
-            </p>
+            {goalPref && (
+              <p className="adventure-goal-hiragana">県庁所在地 ◎　（{goalPref.hiragana}）</p>
+            )}
           </div>
-          {goalPref && (
-            <p className="adventure-goal-hiragana">（{goalPref.hiragana}）</p>
-          )}
         </div>
         {oniActive && !oniIntro && playIntro === 'playing' && <p className="adventure-warning">👹 にげろ！</p>}
       </div>
