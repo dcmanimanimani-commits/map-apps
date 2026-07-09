@@ -71,49 +71,6 @@ function getFitBox(
   };
 }
 
-function getProjectedLandCentroid(
-  projection: GeoProjection,
-  fitGeo: JapanGeoJSON,
-): [number, number] | null {
-  const point = projection(geoCentroid(fitGeo));
-  return point ?? null;
-}
-
-function maxUniformScaleAroundAnchor(
-  bounds: [[number, number], [number, number]],
-  anchorX: number,
-  anchorY: number,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): number {
-  const [[minX, minY], [maxX, maxY]] = bounds;
-  const corners: [number, number][] = [
-    [minX, minY],
-    [minX, maxY],
-    [maxX, minY],
-    [maxX, maxY],
-  ];
-  let scaleMax = Infinity;
-
-  for (const [px, py] of corners) {
-    if (px > anchorX + 0.5) {
-      scaleMax = Math.min(scaleMax, (x2 - anchorX) / (px - anchorX));
-    } else if (px < anchorX - 0.5) {
-      scaleMax = Math.min(scaleMax, (anchorX - x1) / (anchorX - px));
-    }
-
-    if (py > anchorY + 0.5) {
-      scaleMax = Math.min(scaleMax, (y2 - anchorY) / (py - anchorY));
-    } else if (py < anchorY - 0.5) {
-      scaleMax = Math.min(scaleMax, (anchorY - y1) / (anchorY - py));
-    }
-  }
-
-  return scaleMax;
-}
-
 function measureLandBounds(path: GeoPath, fitGeo: JapanGeoJSON): [[number, number], [number, number]] | null {
   let minX = Infinity;
   let minY = Infinity;
@@ -138,10 +95,13 @@ function centerLandAt(
   targetX: number,
   targetY: number,
 ): GeoPath {
-  const centroid = getProjectedLandCentroid(projection, fitGeo);
-  if (!centroid) return geoPath(projection);
+  const path = geoPath(projection);
+  const bounds = measureLandBounds(path, fitGeo);
+  if (!bounds) return path;
 
-  const [cx, cy] = centroid;
+  const [[minX, minY], [maxX, maxY]] = bounds;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
   const [tx, ty] = projection.translate();
   projection.translate([tx + targetX - cx, ty + targetY - cy]);
   return geoPath(projection);
@@ -155,13 +115,18 @@ function normalizeRegionLandFit(
   fill = REGION_LAND_FILL,
 ): GeoPath {
   const { x1, y1, x2, y2, targetX, targetY } = fitBox;
+  const boxW = x2 - x1;
+  const boxH = y2 - y1;
 
   let path = centerLandAt(projection, fitGeo, targetX, targetY);
   const bounds = measureLandBounds(path, fitGeo);
   if (!bounds) return path;
 
-  const scaleFactor = maxUniformScaleAroundAnchor(bounds, targetX, targetY, x1, y1, x2, y2) * fill;
-  if (isFinite(scaleFactor) && scaleFactor > 0 && Math.abs(scaleFactor - 1) >= 0.002) {
+  const [[minX, minY], [maxX, maxY]] = bounds;
+  const landW = Math.max(1, maxX - minX);
+  const landH = Math.max(1, maxY - minY);
+  const scaleFactor = Math.min((boxW * fill) / landW, (boxH * fill) / landH);
+  if (isFinite(scaleFactor) && scaleFactor > 0 && Math.abs(scaleFactor - 1) >= 0.001) {
     const [tx, ty] = projection.translate();
     const scale = projection.scale();
     projection.scale(scale * scaleFactor);
