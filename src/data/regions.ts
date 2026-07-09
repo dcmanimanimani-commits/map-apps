@@ -6,6 +6,12 @@ export interface StudyRegion {
   description: string;
 }
 
+export interface RegionMapTuning {
+  padding: number;
+  offsetY: number;
+  reserveOkinawaInset?: boolean;
+}
+
 export const studyRegions: StudyRegion[] = [
   {
     id: 'hokkaido',
@@ -67,6 +73,21 @@ export const studyRegions: StudyRegion[] = [
 
 export function getStudyRegion(id: string): StudyRegion | undefined {
   return studyRegions.find((r) => r.id === id);
+}
+
+const REGION_MAP_TUNING: Record<string, RegionMapTuning> = {
+  hokkaido: { padding: 1, offsetY: 0 },
+  tohoku: { padding: 7, offsetY: 4 },
+  kanto: { padding: 1, offsetY: 0 },
+  chubu: { padding: 7, offsetY: 4 },
+  kinki: { padding: 7, offsetY: 4 },
+  chugoku: { padding: 1, offsetY: 0 },
+  shikoku: { padding: 7, offsetY: 4 },
+  kyushu: { padding: 0, offsetY: 12, reserveOkinawaInset: true },
+};
+
+export function getRegionMapTuning(id: string): RegionMapTuning {
+  return REGION_MAP_TUNING[id] ?? { padding: 1, offsetY: 0 };
 }
 
 export function getProgressKey(regionId: string, subRegionId?: string): string {

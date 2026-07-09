@@ -48,6 +48,8 @@ interface JapanMapProps {
   regionFocusReserveOkinawaInset?: boolean;
   /** 陸地重心を合わせる点（0–1）。ラベル中央×地図エリア中央が既定 */
   regionFocusLandAnchor?: RegionLandAnchor;
+  /** 地方ごとの微調整オフセット */
+  regionFocusOffsetY?: number;
   renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
@@ -65,6 +67,7 @@ export function JapanMap({
   regionFocusPadding = 2,
   regionFocusReserveOkinawaInset = false,
   regionFocusLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
+  regionFocusOffsetY = 0,
   renderOverlay,
 }: JapanMapProps) {
   const mapInstanceId = useId().replace(/:/g, '');
@@ -264,7 +267,9 @@ export function JapanMap({
 
   const mainlandTransform = useMemo(() => {
     if (!isFocused || mainlandPaths.length === 0) return '';
-    if (includesOkinawa && hasMainlandFocus) return '';
+    if (includesOkinawa && hasMainlandFocus) {
+      return regionFocusOffsetY ? `translate(0 ${regionFocusOffsetY})` : '';
+    }
 
     let weightedX = 0;
     let weightedY = 0;
@@ -283,13 +288,14 @@ export function JapanMap({
     const centerX = weightedX / totalArea;
     const centerY = weightedY / totalArea;
     const dx = width / 2 - centerX;
-    const dy = height / 2 - centerY;
+    const dy = height / 2 - centerY + regionFocusOffsetY;
     return `translate(${dx} ${dy})`;
   }, [
     isFocused,
     mainlandPaths,
     width,
     height,
+    regionFocusOffsetY,
     includesOkinawa,
     hasMainlandFocus,
   ]);

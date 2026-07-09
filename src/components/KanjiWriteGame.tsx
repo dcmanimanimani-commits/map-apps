@@ -6,7 +6,7 @@ import {
   prefectures,
   type Prefecture,
 } from '../data/prefectures';
-import { getStudyRegion, studyRegions, type StudyRegion } from '../data/regions';
+import { getRegionMapTuning, getStudyRegion, studyRegions, type StudyRegion } from '../data/regions';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { createKanjiCharDataLoader } from '../utils/kanjiWriterLoader';
 import { KanjiBossGame } from './KanjiBossGame';
@@ -105,6 +105,10 @@ export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
   const studyRegion = useMemo(
     () => (target ? getStudyRegionForPrefecture(target) : undefined),
     [target],
+  );
+  const regionMapTuning = useMemo(
+    () => (studyRegion ? getRegionMapTuning(studyRegion.id) : { padding: 1, offsetY: 0 }),
+    [studyRegion],
   );
 
   const singleRef = useRef<HTMLDivElement>(null);
@@ -344,7 +348,9 @@ export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
               highlightedKanji={target.kanji}
               focusKanjiSet={regionKanjiSet}
               showPrefectureLabels
-              regionFocusPadding={1}
+              regionFocusPadding={regionMapTuning.padding}
+              regionFocusOffsetY={regionMapTuning.offsetY}
+              regionFocusReserveOkinawaInset={regionMapTuning.reserveOkinawaInset}
               interactive={false}
             />
           </div>

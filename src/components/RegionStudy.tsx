@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { getPrefecturesByRegion, prefectureByKanji, shufflePrefectures, type Prefecture } from '../data/prefectures';
 import { usePlayer } from '../context/PlayerContext';
-import { getStudyRegion } from '../data/regions';
+import { getRegionMapTuning, getStudyRegion } from '../data/regions';
 import { JapanMap } from './JapanMap';
 import { FeedbackBanner } from './FeedbackBanner';
 import { PlayerStatus } from './PlayerStatus';
@@ -30,6 +30,10 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
   const quizGoal = prefs.length;
 
   const regionLabel = region?.name ?? '';
+  const regionMapTuning = useMemo(
+    () => getRegionMapTuning(regionId),
+    [regionId],
+  );
 
   const [phase, setPhase] = useState<Phase>('learn');
   const [selectedKanji, setSelectedKanji] = useState<string | null>(null);
@@ -185,6 +189,9 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
             highlightedKanji={selectedKanji}
             focusKanjiSet={activeKanjiSet}
             showPrefectureLabels
+            regionFocusPadding={regionMapTuning.padding}
+            regionFocusOffsetY={regionMapTuning.offsetY}
+            regionFocusReserveOkinawaInset={regionMapTuning.reserveOkinawaInset}
             onPrefectureClick={handleLearnTap}
             interactive
           />
@@ -223,6 +230,9 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
           correctKanji={correctKanji}
           wrongKanji={wrongKanji}
           focusKanjiSet={activeKanjiSet}
+          regionFocusPadding={regionMapTuning.padding}
+          regionFocusOffsetY={regionMapTuning.offsetY}
+          regionFocusReserveOkinawaInset={regionMapTuning.reserveOkinawaInset}
           interactive={!locked}
         />
       </div>
