@@ -17,7 +17,7 @@ export interface RegionLandAnchor {
   y: number;
 }
 
-export const REGION_LAND_ANCHOR_DEFAULT: RegionLandAnchor = { x: 0.95, y: 0.95 };
+export const REGION_LAND_ANCHOR_DEFAULT: RegionLandAnchor = { x: 0.5, y: 0.5 };
 
 export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';
