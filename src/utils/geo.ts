@@ -1,7 +1,15 @@
 import { geoCentroid, geoPath, geoMercator } from 'd3-geo';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
-import { simplifyOkinawaForInset, trimMainlandForProjection, type PrefectureFeature } from './geoTransform';
+import {
+  simplifyOkinawaForInset,
+  trimForRegionFocus,
+  trimMainlandForProjection,
+  type PrefectureFeature,
+} from './geoTransform';
+
+/** 地方ズーム時に陸地が枠の何割を占めるか（大きいほど海が少ない） */
+export const REGION_LAND_FILL = 0.97;
 
 export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';
@@ -56,7 +64,7 @@ function normalizeRegionLandFit(
   y1: number,
   x2: number,
   y2: number,
-  fill = 0.9,
+  fill = REGION_LAND_FILL,
 ): GeoPath {
   const targetX = (x1 + x2) / 2;
   const targetY = (y1 + y2) / 2;
@@ -81,7 +89,7 @@ function normalizeRegionLandFit(
   const landW = Math.max(1, maxX - minX);
   const landH = Math.max(1, maxY - minY);
   const scaleFactor = Math.min((boxW * fill) / landW, (boxH * fill) / landH);
-  if (!isFinite(scaleFactor) || scaleFactor <= 0 || Math.abs(scaleFactor - 1) < 0.02) {
+  if (!isFinite(scaleFactor) || scaleFactor <= 0 || Math.abs(scaleFactor - 1) < 0.005) {
     return path;
   }
 
@@ -133,7 +141,7 @@ export function createRegionFocusPathGenerator(
   padding = 20,
   reserveOkinawaInset = false,
 ): GeoPath {
-  const fitGeo = trimMainlandForProjection(regionGeo);
+  const fitGeo = trimForRegionFocus(regionGeo);
   const { x1, y1, x2, y2 } = getFitBox(width, height, padding, reserveOkinawaInset);
 
   const projection = geoMercator().fitExtent(
@@ -141,7 +149,7 @@ export function createRegionFocusPathGenerator(
     fitGeo,
   );
 
-  return normalizeRegionLandFit(projection, fitGeo, x1, y1, x2, y2);
+  return normalizeRegionLandFit(projection, fitGeo, x1, y1, x2, y2, REGION_LAND_FILL);
 }
 
 /** 沖縄のみ表示：画面いっぱいにフィット */

@@ -3,7 +3,12 @@ import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
 import { getRegionColor, getShortHiragana, getShortKanji, prefectureByKanji } from '../data/prefectures';
-import { OKINAWA_KANJI, simplifyOkinawaForInset, splitMainlandAndOkinawa } from '../utils/geoTransform';
+import {
+  OKINAWA_KANJI,
+  simplifyOkinawaForInset,
+  splitMainlandAndOkinawa,
+  trimForRegionFocus,
+} from '../utils/geoTransform';
 import { getPrefectureLabelLayout, allowsSeaPrefectureLabel } from '../utils/mapLabels';
 import { ADVENTURE_WORLD_SCALE_W } from '../utils/mapPositions';
 import { prefectureCapitalByKanji } from '../data/prefectureCapitals';
@@ -77,12 +82,13 @@ export function JapanMap({
 
   const visibleMainland = useMemo(() => {
     if (!isFocused || !focusKanjiSet) return mainland;
-    return {
+    const focused = {
       type: 'FeatureCollection' as const,
       features: mainland.features.filter((f) =>
         focusKanjiSet.has(getFeatureKanji(f as Feature<Geometry, GeoJsonProperties & { nam_ja?: string }>)),
       ),
     };
+    return trimForRegionFocus(focused);
   }, [mainland, focusKanjiSet, isFocused]);
 
   const hasMainlandFocus = visibleMainland.features.length > 0;
