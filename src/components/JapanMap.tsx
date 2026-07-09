@@ -266,22 +266,24 @@ export function JapanMap({
     if (!isFocused || mainlandPaths.length === 0) return '';
     if (regionFocusReserveOkinawaInset || (includesOkinawa && hasMainlandFocus)) return '';
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    let weightedX = 0;
+    let weightedY = 0;
+    let totalArea = 0;
 
     for (const { pathGen, feature } of mainlandPaths) {
-      const bounds = pathGen.bounds(feature);
-      minX = Math.min(minX, bounds[0][0]);
-      minY = Math.min(minY, bounds[0][1]);
-      maxX = Math.max(maxX, bounds[1][0]);
-      maxY = Math.max(maxY, bounds[1][1]);
+      const area = pathGen.area(feature);
+      const [cx, cy] = pathGen.centroid(feature);
+      if (!isFinite(area) || area <= 0 || !isFinite(cx) || !isFinite(cy)) continue;
+      weightedX += cx * area;
+      weightedY += cy * area;
+      totalArea += area;
     }
 
-    if (!isFinite(minX)) return '';
-    const dx = width / 2 - (minX + maxX) / 2;
-    const dy = height / 2 - (minY + maxY) / 2;
+    if (totalArea <= 0) return '';
+    const centerX = weightedX / totalArea;
+    const centerY = weightedY / totalArea;
+    const dx = width / 2 - centerX;
+    const dy = height / 2 - centerY;
     return `translate(${dx} ${dy})`;
   }, [
     isFocused,
