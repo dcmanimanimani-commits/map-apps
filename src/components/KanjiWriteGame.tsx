@@ -3,14 +3,18 @@ import HanziWriter from 'hanzi-writer';
 import {
   buildKanjiWriteQueue,
   getWriteKanjiChars,
+  prefectures,
   type Prefecture,
 } from '../data/prefectures';
-import { getStudyRegion, studyRegions } from '../data/regions';
+import { getStudyRegion, studyRegions, type StudyRegion } from '../data/regions';
+import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { createKanjiCharDataLoader } from '../utils/kanjiWriterLoader';
 import { KanjiBossGame } from './KanjiBossGame';
 import { FeedbackBanner } from './FeedbackBanner';
+import { JapanMap } from './JapanMap';
 
 interface KanjiWriteGameProps {
+  geo: JapanGeoJSON;
   onBack: () => void;
 }
 
@@ -26,7 +30,28 @@ function useWriterSize() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  return Math.min(280, Math.max(200, width * 0.42));
+  const padColumn = Math.min(width * 0.4, 220);
+  return Math.min(220, Math.max(168, padColumn - 24));
+}
+
+const PREF_REGION_TO_STUDY_ID: Record<string, string> = {
+  北海道: 'hokkaido',
+  東北: 'tohoku',
+  関東: 'kanto',
+  中部: 'chubu',
+  近畿: 'kinki',
+  中国: 'chugoku',
+  四国: 'shikoku',
+  九州: 'kyushu',
+};
+
+function getStudyRegionForPrefecture(pref: Prefecture): StudyRegion | undefined {
+  const id = PREF_REGION_TO_STUDY_ID[pref.region];
+  return id ? getStudyRegion(id) : undefined;
+}
+
+function getRegionKanjiSet(pref: Prefecture): Set<string> {
+  return new Set(prefectures.filter((p) => p.region === pref.region).map((p) => p.kanji));
 }
 
 function writerOptions(size: number) {
@@ -49,7 +74,7 @@ function writerOptions(size: number) {
   };
 }
 
-export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
+export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
   const [phase, setPhase] = useState<Phase>('select-mode');
   const [mode, setMode] = useState<GameMode | null>(null);
   const [regionId, setRegionId] = useState<string | null>(null);
@@ -66,6 +91,14 @@ export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
   const chars = useMemo(() => (target ? getWriteKanjiChars(target.kanji) : []), [target?.kanji]);
   const currentChar = chars[charIndex];
   const singleSize = useWriterSize();
+  const regionKanjiSet = useMemo(
+    () => (target ? getRegionKanjiSet(target) : new Set<string>()),
+    [target],
+  );
+  const studyRegion = useMemo(
+    () => (target ? getStudyRegionForPrefecture(target) : undefined),
+    [target],
+  );
 
   const singleRef = useRef<HTMLDivElement>(null);
   const writerRef = useRef<HanziWriter | null>(null);
@@ -273,22 +306,42 @@ export function KanjiWriteGame({ onBack }: KanjiWriteGameProps) {
 
       <FeedbackBanner message={feedback.message} type={feedback.type} />
 
-      <div className="hanzi-area">
-        <div
-          ref={singleRef}
-          className="hanzi-canvas hanzi-canvas-lg"
-          style={{ width: singleSize, height: singleSize }}
-        />
-        <p className="hanzi-hint">大きくなぞって書いてね</p>
-      </div>
+      <div className="kanji-write-play-layout">
+        <div className="kanji-write-pad-col">
+          <div className="hanzi-area kanzi-area--compact">
+            <div
+              ref={singleRef}
+              className="hanzi-canvas hanzi-canvas-lg"
+              style={{ width: singleSize, height: singleSize }}
+            />
+            <p className="hanzi-hint">大きくなぞって書いてね</p>
+          </div>
 
-      <div className="hanzi-actions">
-        <button className="btn-secondary" onClick={showStrokeOrder}>
-          📝 書き順を見る
-        </button>
-        <button className="btn-secondary" onClick={retry}>
-          🔄 やり直し
-        </button>
+          <div className="hanzi-actions hanzi-actions--stack">
+            <button className="btn-secondary" type="button" onClick={showStrokeOrder}>
+              📝 書き順を見る
+            </button>
+            <button className="btn-secondary" type="button" onClick={retry}>
+              🔄 やり直し
+            </button>
+          </div>
+        </div>
+
+        <div className="kanji-write-map-col">
+          <p className="kanji-write-map-label">
+            {studyRegion ? `${studyRegion.emoji} ${studyRegion.name}` : `${target.region}地方`}
+          </p>
+          <div className="map-container compact-map region-focus-map kanji-write-region-map">
+            <JapanMap
+              geo={geo}
+              highlightedKanji={target.kanji}
+              focusKanjiSet={regionKanjiSet}
+              showPrefectureLabels
+              interactive={false}
+            />
+          </div>
+          <p className="kanji-write-map-hint">お題の県が色づいているよ！</p>
+        </div>
       </div>
     </div>
   );

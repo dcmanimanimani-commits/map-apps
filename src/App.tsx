@@ -95,7 +95,7 @@ function AppContent() {
 
   if (screen === 'where') return <WhereGame geo={geo} onBack={() => setScreen('home')} />;
   if (screen === 'landmark') return <LandmarkGame geo={geo} onBack={() => setScreen('home')} />;
-  if (screen === 'kanji') return <KanjiWriteGame onBack={() => setScreen('home')} />;
+  if (screen === 'kanji') return <KanjiWriteGame geo={geo} onBack={() => setScreen('home')} />;
   if (screen === 'explore') return <ExploreMode geo={geo} onBack={() => setScreen('home')} />;
   if (screen === 'adventure') return <AvatarAdventureGame geo={geo} onBack={() => setScreen('home')} />;
 
