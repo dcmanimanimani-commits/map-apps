@@ -42,7 +42,7 @@ const MINION_COUNT = 3;
 /** 小さい鬼は大王よりゆっくり（とことこ） */
 const MINION_SPEEDS = [3.0, 3.25, 3.5] as const;
 const ONI_INTRO_MS = 1000;
-const GOAL_REVEAL_MS = 2800;
+const GOAL_REVEAL_MS = 4800;
 const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 152;
@@ -577,20 +577,25 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                     className="adventure-overlay"
                     style={{ width: worldSize.width, height: worldSize.height }}
                   >
-                    {Array.from(capitals.entries()).map(([kanji, pos]) => (
+                    {Array.from(capitals.entries()).map(([kanji, pos]) => {
+                      const isGoalReveal = playIntro === 'goal-reveal' && kanji === goalPref?.kanji;
+                      return (
                       <div
                         key={kanji}
                         className={`adventure-capital-marker${
-                          playIntro === 'goal-reveal' && kanji === goalPref?.kanji
-                            ? ' adventure-capital-marker--goal'
-                            : ''
+                          isGoalReveal ? ' adventure-capital-marker--goal' : ''
                         }`}
-                        style={{ left: pos.x, top: pos.y, fontSize: capitalMarkerSize }}
+                        style={{
+                          left: pos.x,
+                          top: pos.y,
+                          fontSize: isGoalReveal ? capitalMarkerSize * 2.5 : capitalMarkerSize,
+                        }}
                         aria-hidden
                       >
                         ◎
                       </div>
-                    ))}
+                      );
+                    })}
                     {playIntro !== 'goal-reveal' && (
                     <MapCharacterSprite
                       x={playerPos.x}

@@ -2701,28 +2701,31 @@ html.boss-no-select .scribble-kanji-input {
 }
 
 .adventure-goal-title-wrap {
-  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: clamp(2.8rem, 11vw, 3.6rem);
-  margin: 0.1rem 0;
+  gap: 0.2rem;
+  margin: 0.15rem 0 0.05rem;
+  padding: 0 0.25rem;
 }
 
 .adventure-goal-region-bg {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(1.6rem, 7.5vw, 2.6rem);
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding-left: 0.15rem;
+  font-size: clamp(1rem, 4.2vw, 1.35rem);
   font-weight: 900;
-  color: rgba(180, 83, 9, 0.2);
-  letter-spacing: 0.05em;
+  color: rgba(146, 64, 14, 0.72);
+  letter-spacing: 0.07em;
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
   user-select: none;
+}
+
+.adventure-goal-banner--reveal .adventure-goal-region-bg {
+  color: rgba(180, 83, 9, 0.88);
 }
 
 .adventure-goal-eyebrow {
@@ -2739,8 +2742,9 @@ html.boss-no-select .scribble-kanji-input {
   z-index: 1;
   margin: 0;
   line-height: 1.25;
-  text-align: center;
+  text-align: right;
   width: 100%;
+  padding-right: 0.15rem;
 }
 
 .adventure-goal-kanji {
@@ -2875,17 +2879,23 @@ html.boss-no-select .scribble-kanji-input {
 
 .adventure-capital-marker--goal {
   z-index: 4;
-  animation: adventure-goal-marker-pulse 0.9s ease-in-out infinite alternate;
+  color: #dc2626;
+  -webkit-text-stroke: 3px #ffffff;
+  animation: adventure-goal-marker-pulse 0.5s ease-in-out infinite alternate;
 }
 
 @keyframes adventure-goal-marker-pulse {
   from {
     transform: translate(-50%, -50%) scale(1);
-    color: #dc2626;
+    opacity: 1;
+    color: #ef4444;
+    filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.95));
   }
   to {
-    transform: translate(-50%, -50%) scale(1.22);
+    transform: translate(-50%, -50%) scale(1.12);
+    opacity: 0.25;
     color: #b91c1c;
+    filter: drop-shadow(0 0 22px rgba(239, 68, 68, 1));
   }
 }
 
