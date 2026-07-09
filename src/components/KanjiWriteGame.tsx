@@ -22,16 +22,23 @@ type Phase = 'select-mode' | 'select-region' | 'play' | 'finish' | 'boss';
 type GameMode = 'regional' | 'national';
 
 function useWriterSize() {
-  const [width, setWidth] = useState(() => window.innerWidth);
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
 
   useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
+    const onResize = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const padColumn = Math.min(width * 0.4, 220);
-  return Math.min(220, Math.max(168, padColumn - 24));
+  const colWidth = Math.min(viewport.width * 0.5, 320);
+  const byWidth = colWidth - 12;
+  const byHeight = viewport.height * 0.4;
+  return Math.round(Math.min(300, Math.max(200, Math.min(byWidth, byHeight))));
 }
 
 const PREF_REGION_TO_STUDY_ID: Record<string, string> = {
@@ -58,7 +65,7 @@ function writerOptions(size: number) {
   return {
     width: size,
     height: size,
-    padding: Math.round(size * 0.05),
+    padding: Math.round(size * 0.03),
     showOutline: true,
     strokeColor: '#1e3a5f',
     outlineColor: '#cbd5e1',
@@ -337,6 +344,7 @@ export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
               highlightedKanji={target.kanji}
               focusKanjiSet={regionKanjiSet}
               showPrefectureLabels
+              regionFocusPadding={4}
               interactive={false}
             />
           </div>

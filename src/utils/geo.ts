@@ -39,13 +39,17 @@ export function createMainlandPathGenerator(mainland: JapanGeoJSON, width: numbe
 }
 
 /** 選択地方のみ表示：その地方にフィットする投影 */
-export function createRegionFocusPathGenerator(regionGeo: JapanGeoJSON, width: number, height: number): GeoPath {
-  const pad = 20;
+export function createRegionFocusPathGenerator(
+  regionGeo: JapanGeoJSON,
+  width: number,
+  height: number,
+  padding = 20,
+): GeoPath {
   const fitGeo = trimMainlandForProjection(regionGeo);
 
   return geoPath(
     geoMercator().fitExtent(
-      [[pad, pad], [width - pad, height - pad]],
+      [[padding, padding], [width - padding, height - padding]],
       fitGeo,
     ),
   );

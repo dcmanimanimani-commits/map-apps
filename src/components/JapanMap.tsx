@@ -35,6 +35,8 @@ interface JapanMapProps {
   interactive?: boolean;
   /** ワールド座標用の固定サイズ（たんけんモードなど） */
   fixedSize?: { width: number; height: number };
+  /** 地方ズーム時の海まわり余白（小さいほど陸地が大きく） */
+  regionFocusPadding?: number;
   renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
@@ -49,6 +51,7 @@ export function JapanMap({
   onPrefectureClick,
   interactive = true,
   fixedSize,
+  regionFocusPadding = 20,
   renderOverlay,
 }: JapanMapProps) {
   const mapInstanceId = useId().replace(/:/g, '');
@@ -94,7 +97,7 @@ export function JapanMap({
     if (source.features.length === 0) return [];
 
     const pathGen = isFocused
-      ? createRegionFocusPathGenerator(visibleMainland, width, height)
+      ? createRegionFocusPathGenerator(visibleMainland, width, height, regionFocusPadding)
       : createMainlandPathGenerator(mainland, width, height);
 
     return source.features.map((feature) => {
@@ -109,7 +112,7 @@ export function JapanMap({
         feature: feature as Feature<Geometry, GeoJsonProperties>,
       };
     });
-  }, [showOkinawaFull, isFocused, visibleMainland, mainland, width, height]);
+  }, [showOkinawaFull, isFocused, visibleMainland, mainland, width, height, regionFocusPadding]);
 
   const okinawaFullPath = useMemo(() => {
     if (!showOkinawaFull || !okinawa) return null;
