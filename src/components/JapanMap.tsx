@@ -262,6 +262,37 @@ export function JapanMap({
     return items;
   }, [showPrefectureLabels, okinawaFullPath, mainlandPaths, labelFontSize, mapInstanceId]);
 
+  const mainlandTransform = useMemo(() => {
+    if (!isFocused || mainlandPaths.length === 0) return '';
+    if (regionFocusReserveOkinawaInset || (includesOkinawa && hasMainlandFocus)) return '';
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const { pathGen, feature } of mainlandPaths) {
+      const bounds = pathGen.bounds(feature);
+      minX = Math.min(minX, bounds[0][0]);
+      minY = Math.min(minY, bounds[0][1]);
+      maxX = Math.max(maxX, bounds[1][0]);
+      maxY = Math.max(maxY, bounds[1][1]);
+    }
+
+    if (!isFinite(minX)) return '';
+    const dx = width / 2 - (minX + maxX) / 2;
+    const dy = height / 2 - (minY + maxY) / 2;
+    return `translate(${dx} ${dy})`;
+  }, [
+    isFocused,
+    mainlandPaths,
+    width,
+    height,
+    regionFocusReserveOkinawaInset,
+    includesOkinawa,
+    hasMainlandFocus,
+  ]);
+
   const insetLabel = useMemo(() => {
     if (!showPrefectureLabels || !okinawaInset || okinawaFullPath) return null;
 
@@ -402,7 +433,11 @@ export function JapanMap({
         </defs>
         <rect width={width} height={height} fill={`url(#${OCEAN_GRADIENT_ID})`} rx="8" />
 
-        <g className="mainland-layer" clipPath={`url(#${MAINLAND_CLIP_ID})`}>
+        <g
+          className="mainland-layer"
+          clipPath={`url(#${MAINLAND_CLIP_ID})`}
+          transform={mainlandTransform || undefined}
+        >
           {mainlandPaths.map(({ kanji, d, color }) =>
             d ? renderPath(kanji, d, color) : null,
           )}
