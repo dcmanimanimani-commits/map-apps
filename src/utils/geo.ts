@@ -9,7 +9,15 @@ import {
 } from './geoTransform';
 
 /** 地方ズーム時に陸地が枠の何割を占めるか（大きいほど海が少ない） */
-export const REGION_LAND_FILL = 0.99;
+export const REGION_LAND_FILL = 1;
+
+/** 地方ラベル中央の垂線と地図（海）エリア中央の交点（正規化 0–1） */
+export interface RegionLandAnchor {
+  x: number;
+  y: number;
+}
+
+export const REGION_LAND_ANCHOR_DEFAULT: RegionLandAnchor = { x: 0.5, y: 0.5 };
 
 export const OCEAN_GRADIENT_ID = 'ocean-gradient';
 export const MAINLAND_CLIP_ID = 'mainland-clip';
@@ -32,6 +40,7 @@ function getFitBox(
   height: number,
   padding: number,
   reserveOkinawaInset: boolean,
+  landAnchor: RegionLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
 ): RegionFitBox {
   const x1 = padding;
   const y1 = padding;
@@ -57,9 +66,52 @@ function getFitBox(
     y1,
     x2,
     y2,
-    targetX: width / 2,
-    targetY: height / 2,
+    targetX: width * landAnchor.x,
+    targetY: height * landAnchor.y,
   };
+}
+
+function getProjectedLandCentroid(
+  projection: GeoProjection,
+  fitGeo: JapanGeoJSON,
+): [number, number] | null {
+  const point = projection(geoCentroid(fitGeo));
+  return point ?? null;
+}
+
+function maxUniformScaleAroundAnchor(
+  bounds: [[number, number], [number, number]],
+  anchorX: number,
+  anchorY: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): number {
+  const [[minX, minY], [maxX, maxY]] = bounds;
+  const corners: [number, number][] = [
+    [minX, minY],
+    [minX, maxY],
+    [maxX, minY],
+    [maxX, maxY],
+  ];
+  let scaleMax = Infinity;
+
+  for (const [px, py] of corners) {
+    if (px > anchorX + 0.5) {
+      scaleMax = Math.min(scaleMax, (x2 - anchorX) / (px - anchorX));
+    } else if (px < anchorX - 0.5) {
+      scaleMax = Math.min(scaleMax, (anchorX - x1) / (anchorX - px));
+    }
+
+    if (py > anchorY + 0.5) {
+      scaleMax = Math.min(scaleMax, (y2 - anchorY) / (py - anchorY));
+    } else if (py < anchorY - 0.5) {
+      scaleMax = Math.min(scaleMax, (anchorY - y1) / (anchorY - py));
+    }
+  }
+
+  return scaleMax;
 }
 
 function measureLandBounds(path: GeoPath, fitGeo: JapanGeoJSON): [[number, number], [number, number]] | null {
@@ -86,13 +138,10 @@ function centerLandAt(
   targetX: number,
   targetY: number,
 ): GeoPath {
-  const path = geoPath(projection);
-  const bounds = measureLandBounds(path, fitGeo);
-  if (!bounds) return path;
+  const centroid = getProjectedLandCentroid(projection, fitGeo);
+  if (!centroid) return geoPath(projection);
 
-  const [[minX, minY], [maxX, maxY]] = bounds;
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
+  const [cx, cy] = centroid;
   const [tx, ty] = projection.translate();
   projection.translate([tx + targetX - cx, ty + targetY - cy]);
   return geoPath(projection);
@@ -106,18 +155,13 @@ function normalizeRegionLandFit(
   fill = REGION_LAND_FILL,
 ): GeoPath {
   const { x1, y1, x2, y2, targetX, targetY } = fitBox;
-  const boxW = x2 - x1;
-  const boxH = y2 - y1;
 
   let path = centerLandAt(projection, fitGeo, targetX, targetY);
-  let bounds = measureLandBounds(path, fitGeo);
+  const bounds = measureLandBounds(path, fitGeo);
   if (!bounds) return path;
 
-  let [[minX, minY], [maxX, maxY]] = bounds;
-  const landW = Math.max(1, maxX - minX);
-  const landH = Math.max(1, maxY - minY);
-  const scaleFactor = Math.min((boxW * fill) / landW, (boxH * fill) / landH);
-  if (isFinite(scaleFactor) && scaleFactor > 0 && Math.abs(scaleFactor - 1) >= 0.005) {
+  const scaleFactor = maxUniformScaleAroundAnchor(bounds, targetX, targetY, x1, y1, x2, y2) * fill;
+  if (isFinite(scaleFactor) && scaleFactor > 0 && Math.abs(scaleFactor - 1) >= 0.002) {
     const [tx, ty] = projection.translate();
     const scale = projection.scale();
     projection.scale(scale * scaleFactor);
@@ -164,11 +208,12 @@ export function createRegionFocusPathGenerator(
   regionGeo: JapanGeoJSON,
   width: number,
   height: number,
-  padding = 20,
+  padding = 2,
   reserveOkinawaInset = false,
+  landAnchor: RegionLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
 ): GeoPath {
   const fitGeo = trimForRegionFocus(regionGeo);
-  const fitBox = getFitBox(width, height, padding, reserveOkinawaInset);
+  const fitBox = getFitBox(width, height, padding, reserveOkinawaInset, landAnchor);
 
   const projection = geoMercator().fitExtent(
     [[fitBox.x1, fitBox.y1], [fitBox.x2, fitBox.y2]],

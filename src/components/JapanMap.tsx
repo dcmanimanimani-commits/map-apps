@@ -24,6 +24,8 @@ import {
   OKINAWA_INSET_SCALE_FULL,
   OKINAWA_INSET_SCALE_REGION,
   OCEAN_GRADIENT_ID,
+  REGION_LAND_ANCHOR_DEFAULT,
+  type RegionLandAnchor,
 } from '../utils/geo';
 
 interface JapanMapProps {
@@ -44,6 +46,8 @@ interface JapanMapProps {
   regionFocusPadding?: number;
   /** 九州＋沖縄のように本州側と沖縄インセットを両方表示するとき */
   regionFocusReserveOkinawaInset?: boolean;
+  /** 陸地重心を合わせる点（0–1）。ラベル中央×地図エリア中央が既定 */
+  regionFocusLandAnchor?: RegionLandAnchor;
   renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
@@ -58,8 +62,9 @@ export function JapanMap({
   onPrefectureClick,
   interactive = true,
   fixedSize,
-  regionFocusPadding = 6,
+  regionFocusPadding = 2,
   regionFocusReserveOkinawaInset = false,
+  regionFocusLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
   renderOverlay,
 }: JapanMapProps) {
   const mapInstanceId = useId().replace(/:/g, '');
@@ -112,6 +117,7 @@ export function JapanMap({
         height,
         regionFocusPadding,
         regionFocusReserveOkinawaInset || (includesOkinawa && hasMainlandFocus),
+        regionFocusLandAnchor,
       )
       : createMainlandPathGenerator(mainland, width, height);
 
@@ -138,6 +144,7 @@ export function JapanMap({
     regionFocusReserveOkinawaInset,
     includesOkinawa,
     hasMainlandFocus,
+    regionFocusLandAnchor,
   ]);
 
   const okinawaFullPath = useMemo(() => {
