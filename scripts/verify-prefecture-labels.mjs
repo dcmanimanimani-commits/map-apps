@@ -1,8 +1,5 @@
 import { readFileSync } from 'node:fs';
-import {
-  getPrefectureLabelLayout,
-  allowsSeaPrefectureLabel,
-} from '../src/utils/mapLabels.ts';
+import { getPrefectureLabelLayout } from '../src/utils/mapLabels.ts';
 import { getShortKanji, getShortHiragana, prefectureByKanji, prefectures } from '../src/data/prefectures.ts';
 import { splitMainlandAndOkinawa, trimForRegionFocus, OKINAWA_KANJI } from '../src/utils/geoTransform.ts';
 import { createRegionFocusPathGenerator, getFeatureKanji } from '../src/utils/geo.ts';
@@ -26,50 +23,21 @@ const REGION_BY_PREF = {
   九州: 'kyushu',
 };
 
-function projectCapitalLabel(kanji, name, hiragana, pathGen) {
-  const capital = prefectureCapitalByKanji.get(kanji);
-  const projection = pathGen.projection();
-  if (!capital || !projection || typeof projection !== 'function') return null;
-  const projected = projection([capital.lon, capital.lat]);
-  if (!projected) return null;
-  return {
-    x: projected[0],
-    y: projected[1],
-    fontSize: Math.max(6, Math.min(maxFontSize, 12)),
-    clip: false,
-    name,
-    hiragana,
-  };
-}
-
 function evaluateLabel(kanji, feature, pathGen) {
   const pref = prefectureByKanji.get(kanji);
   const name = getShortKanji(kanji);
   const hiragana = pref ? getShortHiragana(kanji, pref.hiragana) : '';
-  const seaLabel = allowsSeaPrefectureLabel(kanji);
-
-  if (seaLabel && kanji !== OKINAWA_KANJI) {
-    const capital = projectCapitalLabel(kanji, name, hiragana, pathGen);
-    if (capital) return { status: 'capital-first', ...capital };
-  }
-
+  const capital = prefectureCapitalByKanji.get(kanji);
   const layout = getPrefectureLabelLayout(feature, pathGen, name, hiragana, maxFontSize, {
-    allowOutside: seaLabel,
+    capital: capital ? { lon: capital.lon, lat: capital.lat } : undefined,
   });
-
-  if (layout && !(layout.clip && layout.fontSize < 8)) {
-    return { status: 'polylabel', ...layout, name, hiragana };
-  }
-
-  const capital = projectCapitalLabel(kanji, name, hiragana, pathGen);
-  if (capital) return { status: 'capital-fallback', ...capital };
-  if (layout) return { status: 'small-clipped', ...layout, name, hiragana };
-  return { status: 'missing', name, hiragana };
+  if (!layout) return { status: 'missing', name, hiragana };
+  return { status: layout.placement, ...layout, name, hiragana };
 }
 
 const missing = [];
-const fallback = [];
-const small = [];
+const sea = [];
+const interior = [];
 
 for (const region of studyRegions) {
   const regionPrefs = prefectures.filter((p) => REGION_BY_PREF[p.region] === region.id);
@@ -91,9 +59,10 @@ for (const region of studyRegions) {
   for (const feature of trimmed.features) {
     const kanji = getFeatureKanji(feature);
     const result = evaluateLabel(kanji, feature, pathGen);
-    if (result.status === 'missing') missing.push({ region: region.id, kanji, ...result });
-    if (result.status === 'capital-fallback') fallback.push({ region: region.id, kanji, ...result });
-    if (result.status === 'small-clipped') small.push({ region: region.id, kanji, ...result });
+    const entry = { region: region.id, kanji, ...result };
+    if (result.status === 'missing') missing.push(entry);
+    if (result.status === 'sea') sea.push(entry);
+    if (result.status === 'interior') interior.push(entry);
   }
 }
 
@@ -106,13 +75,17 @@ if (okinawa) {
     false,
   );
   const result = evaluateLabel(OKINAWA_KANJI, okinawa, pathGen);
-  if (result.status === 'missing') missing.push({ region: 'okinawa-only', kanji: OKINAWA_KANJI, ...result });
-  if (result.status === 'capital-fallback') fallback.push({ region: 'okinawa-only', kanji: OKINAWA_KANJI, ...result });
-  if (result.status === 'small-clipped') small.push({ region: 'okinawa-only', kanji: OKINAWA_KANJI, ...result });
+  const entry = { region: 'okinawa-only', kanji: OKINAWA_KANJI, ...result };
+  if (result.status === 'missing') missing.push(entry);
+  if (result.status === 'sea') sea.push(entry);
+  if (result.status === 'interior') interior.push(entry);
 }
 
+const watch = ['青森県', '福井県', '石川県', '高知県', '長崎県'];
+const watchResults = [...interior, ...sea].filter((e) => watch.includes(e.kanji));
+
 console.log('Missing labels:', missing.length ? missing : 'none');
-console.log('Capital fallback needed:', fallback.length ? fallback : 'none');
-console.log('Small clipped labels:', small.length ? small : 'none');
+console.log('Sea placement:', sea.length ? sea.map(({ region, kanji, fontSize }) => `${kanji}@${region}(${fontSize}px)`) : 'none');
+console.log('Watched prefectures:', watchResults.length ? watchResults : 'none found in scan');
 
 if (missing.length > 0) process.exit(1);

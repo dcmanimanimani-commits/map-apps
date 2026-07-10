@@ -4,6 +4,9 @@ import { geoCentroid } from 'd3-geo';
 
 type Point = [number, number];
 
+const MIN_INTERIOR_FONT_SIZE = 8;
+const MIN_SEA_FONT_SIZE = 6;
+
 function ringArea(ring: Point[]): number {
   let sum = 0;
   for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
@@ -157,13 +160,13 @@ export interface PrefectureLabelLayout {
   y: number;
   fontSize: number;
   clip: boolean;
+  placement: 'interior' | 'sea';
 }
 
-/** 海岸沿いなど細長い県は県庁所在地付近にラベルを置く */
-export const SEA_LABEL_PREFECTURES = new Set(['沖縄県', '長崎県', '高知県']);
-
-export function allowsSeaPrefectureLabel(kanji: string): boolean {
-  return SEA_LABEL_PREFECTURES.has(kanji);
+export interface PrefectureLabelOptions {
+  capital?: { lon: number; lat: number };
+  minInteriorFontSize?: number;
+  minSeaFontSize?: number;
 }
 
 export function geometryToProjectedRings(
@@ -173,13 +176,106 @@ export function geometryToProjectedRings(
   return geometryToRings(geometry, project);
 }
 
+function estimateLabelBox(name: string, hiragana: string, fontSize: number) {
+  const longest = Math.max(name.length, hiragana.length);
+  return {
+    width: longest * fontSize * 0.92,
+    height: fontSize * 1.75,
+  };
+}
+
+/** 漢字・ひらがな2行が陸地内に完全に収まるか */
+export function labelFitsInside(
+  ring: Point[],
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): boolean {
+  const { width } = estimateLabelBox(name, hiragana, fontSize);
+  const halfW = width / 2;
+  const kanjiY = y - fontSize * 0.55;
+  const hiraY = y + fontSize * 0.6;
+  const top = Math.min(kanjiY, hiraY) - fontSize * 0.15;
+  const bottom = Math.max(kanjiY, hiraY) + fontSize * 0.15;
+
+  const samples: Point[] = [
+    [x, y],
+    [x - halfW, kanjiY],
+    [x + halfW, kanjiY],
+    [x - halfW, hiraY],
+    [x + halfW, hiraY],
+    [x, top],
+    [x, bottom],
+    [x - halfW, y],
+    [x + halfW, y],
+  ];
+
+  return samples.every(([px, py]) => pointInPolygon(px, py, ring));
+}
+
+function computeMaxFontSize(
+  bounds: ReturnType<typeof ringBounds>,
+  name: string,
+  hiragana: string,
+  maxFontSize: number,
+): number {
+  const longest = Math.max(name.length, hiragana.length);
+  const byHeight = Math.min(bounds.width, bounds.height) / 2.6;
+  const byWidth = Math.min(bounds.width, bounds.height) / Math.max(1.1, longest * 0.72);
+  return Math.max(5, Math.min(maxFontSize, byHeight, byWidth));
+}
+
+function findInteriorLayout(
+  ring: Point[],
+  candidates: Point[],
+  name: string,
+  hiragana: string,
+  maxFontSize: number,
+  minInteriorFontSize: number,
+): PrefectureLabelLayout | null {
+  const bounds = ringBounds(ring);
+  const startFontSize = Math.floor(computeMaxFontSize(bounds, name, hiragana, maxFontSize));
+
+  for (const [x, y] of candidates) {
+    if (!pointInPolygon(x, y, ring)) continue;
+    for (let fontSize = startFontSize; fontSize >= minInteriorFontSize; fontSize--) {
+      if (labelFitsInside(ring, x, y, name, hiragana, fontSize)) {
+        return { x, y, fontSize, clip: true, placement: 'interior' };
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildSeaLayout(
+  project: (coords: [number, number]) => [number, number] | null,
+  capital: { lon: number; lat: number },
+  maxFontSize: number,
+  minSeaFontSize: number,
+): PrefectureLabelLayout | null {
+  const projected = project([capital.lon, capital.lat]);
+  if (!projected) return null;
+
+  const fontSize = Math.max(minSeaFontSize, Math.min(maxFontSize, 12));
+  return {
+    x: projected[0],
+    y: projected[1],
+    fontSize,
+    clip: false,
+    placement: 'sea',
+  };
+}
+
 export function getPrefectureLabelLayout(
   feature: Feature<Geometry, GeoJsonProperties>,
   pathGen: GeoPath,
   name: string,
   hiragana: string,
   maxFontSize: number,
-  options?: { allowOutside?: boolean; precision?: number },
+  options?: PrefectureLabelOptions,
 ): PrefectureLabelLayout | null {
   const projection = pathGen.projection();
   if (!projection || typeof projection !== 'function') return null;
@@ -189,22 +285,32 @@ export function getPrefectureLabelLayout(
   const ring = largestRing(rings);
   if (!ring) return null;
 
+  const minInteriorFontSize = options?.minInteriorFontSize ?? MIN_INTERIOR_FONT_SIZE;
+  const minSeaFontSize = options?.minSeaFontSize ?? MIN_SEA_FONT_SIZE;
   const bounds = ringBounds(ring);
-  const precision = options?.precision ?? Math.max(0.25, Math.min(bounds.width, bounds.height) * 0.02);
-  const [x, y] = polylabel(ring, precision);
+  const precision = Math.max(0.25, Math.min(bounds.width, bounds.height) * 0.02);
 
-  const longest = Math.max(name.length, hiragana.length);
-  const byHeight = Math.min(bounds.width, bounds.height) / 2.6;
-  const byWidth = Math.min(bounds.width, bounds.height) / Math.max(1.1, longest * 0.72);
-  const fontSize = Math.max(5, Math.min(maxFontSize, byHeight, byWidth));
-
-  if (!options?.allowOutside && !pointInPolygon(x, y, ring)) {
-    const centroid = project(geoCentroid(feature) as [number, number]);
-    if (centroid && pointInPolygon(centroid[0], centroid[1], ring)) {
-      return { x: centroid[0], y: centroid[1], fontSize, clip: true };
-    }
-    return null;
+  const candidates: Point[] = [polylabel(ring, precision)];
+  const centroid = project(geoCentroid(feature) as [number, number]);
+  if (centroid) candidates.push(centroid);
+  if (options?.capital) {
+    const capitalPoint = project([options.capital.lon, options.capital.lat]);
+    if (capitalPoint) candidates.push(capitalPoint);
   }
 
-  return { x, y, fontSize, clip: !options?.allowOutside };
+  const interior = findInteriorLayout(
+    ring,
+    candidates,
+    name,
+    hiragana,
+    maxFontSize,
+    minInteriorFontSize,
+  );
+  if (interior) return interior;
+
+  if (options?.capital) {
+    return buildSeaLayout(project, options.capital, maxFontSize, minSeaFontSize);
+  }
+
+  return null;
 }

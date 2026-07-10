@@ -9,7 +9,7 @@ import {
   splitMainlandAndOkinawa,
   trimForRegionFocus,
 } from '../utils/geoTransform';
-import { getPrefectureLabelLayout, allowsSeaPrefectureLabel } from '../utils/mapLabels';
+import { getPrefectureLabelLayout } from '../utils/mapLabels';
 import { ADVENTURE_WORLD_SCALE_W } from '../utils/mapPositions';
 import { prefectureCapitalByKanji } from '../data/prefectureCapitals';
 import {
@@ -187,73 +187,21 @@ export function JapanMap({
     clipPathId?: string;
   }
 
-  function buildCapitalLabel(
-    kanji: string,
-    name: string,
-    hiragana: string,
-    pathGen: ReturnType<typeof createMainlandPathGenerator>,
-    maxFontSize: number,
-  ): MapLabel | null {
-    const capital = prefectureCapitalByKanji.get(kanji);
-    const projection = pathGen.projection();
-    if (!capital || !projection || typeof projection !== 'function') return null;
-
-    const projected = (projection as (coords: [number, number]) => [number, number] | null)([
-      capital.lon,
-      capital.lat,
-    ]);
-    if (!projected) return null;
-
-    const fontSize = Math.max(6, Math.min(maxFontSize, 12));
-    return {
-      kanji,
-      name,
-      hiragana,
-      x: projected[0],
-      y: projected[1],
-      fontSize,
-      clip: false,
-    };
-  }
-
   function buildLabel(
     kanji: string,
     feature: Feature<Geometry, GeoJsonProperties>,
     pathGen: ReturnType<typeof createMainlandPathGenerator>,
     pathD: string | null,
     maxFontSize: number,
-    allowOutside = false,
   ): MapLabel | null {
     const pref = prefectureByKanji.get(kanji);
     const name = getShortKanji(kanji);
     const hiragana = pref ? getShortHiragana(kanji, pref.hiragana) : '';
-    const seaLabel = allowOutside || allowsSeaPrefectureLabel(kanji);
-
-    if (seaLabel && kanji !== OKINAWA_KANJI) {
-      const capitalLabel = buildCapitalLabel(kanji, name, hiragana, pathGen, maxFontSize);
-      if (capitalLabel) return capitalLabel;
-    }
+    const capital = prefectureCapitalByKanji.get(kanji);
 
     const layout = getPrefectureLabelLayout(feature, pathGen, name, hiragana, maxFontSize, {
-      allowOutside: seaLabel,
+      capital: capital ? { lon: capital.lon, lat: capital.lat } : undefined,
     });
-
-    if (layout && !(layout.clip && layout.fontSize < 8)) {
-      return {
-        kanji,
-        name,
-        hiragana,
-        x: layout.x,
-        y: layout.y,
-        fontSize: layout.fontSize,
-        clip: layout.clip,
-        clipPathId: layout.clip && pathD ? `pref-clip-${mapInstanceId}-${kanji}` : undefined,
-      };
-    }
-
-    const capitalLabel = buildCapitalLabel(kanji, name, hiragana, pathGen, maxFontSize);
-    if (capitalLabel) return capitalLabel;
-
     if (!layout) return null;
 
     return {
@@ -280,14 +228,13 @@ export function JapanMap({
         okinawaFullPath.pathGen,
         okinawaFullPath.d,
         labelFontSize,
-        true,
       );
       if (label) items.push(label);
       return items;
     }
 
     for (const { kanji, pathGen, feature, d } of mainlandPaths) {
-      const label = buildLabel(kanji, feature, pathGen, d, labelFontSize, allowsSeaPrefectureLabel(kanji));
+      const label = buildLabel(kanji, feature, pathGen, d, labelFontSize);
       if (label) items.push(label);
     }
 
@@ -338,7 +285,6 @@ export function JapanMap({
       okinawaInset.pathGen,
       okinawaInset.d,
       insetLabelFontSize,
-      true,
     );
   }, [showPrefectureLabels, okinawaInset, okinawaFullPath, insetLabelFontSize, mapInstanceId]);
 
