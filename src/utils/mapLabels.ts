@@ -159,8 +159,8 @@ export interface PrefectureLabelLayout {
   clip: boolean;
 }
 
-/** 沖縄・長崎は海側表示を許可 */
-export const SEA_LABEL_PREFECTURES = new Set(['沖縄県', '長崎県']);
+/** 海岸沿いなど細長い県は県庁所在地付近にラベルを置く */
+export const SEA_LABEL_PREFECTURES = new Set(['沖縄県', '長崎県', '高知県']);
 
 export function allowsSeaPrefectureLabel(kanji: string): boolean {
   return SEA_LABEL_PREFECTURES.has(kanji);

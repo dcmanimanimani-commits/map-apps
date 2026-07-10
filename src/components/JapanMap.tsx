@@ -187,6 +187,35 @@ export function JapanMap({
     clipPathId?: string;
   }
 
+  function buildCapitalLabel(
+    kanji: string,
+    name: string,
+    hiragana: string,
+    pathGen: ReturnType<typeof createMainlandPathGenerator>,
+    maxFontSize: number,
+  ): MapLabel | null {
+    const capital = prefectureCapitalByKanji.get(kanji);
+    const projection = pathGen.projection();
+    if (!capital || !projection || typeof projection !== 'function') return null;
+
+    const projected = (projection as (coords: [number, number]) => [number, number] | null)([
+      capital.lon,
+      capital.lat,
+    ]);
+    if (!projected) return null;
+
+    const fontSize = Math.max(6, Math.min(maxFontSize, 12));
+    return {
+      kanji,
+      name,
+      hiragana,
+      x: projected[0],
+      y: projected[1],
+      fontSize,
+      clip: false,
+    };
+  }
+
   function buildLabel(
     kanji: string,
     feature: Feature<Geometry, GeoJsonProperties>,
@@ -201,32 +230,32 @@ export function JapanMap({
     const seaLabel = allowOutside || allowsSeaPrefectureLabel(kanji);
 
     if (seaLabel && kanji !== OKINAWA_KANJI) {
-      const capital = prefectureCapitalByKanji.get(kanji);
-      const projection = pathGen.projection();
-      if (capital && projection && typeof projection === 'function') {
-        const projected = (projection as (coords: [number, number]) => [number, number] | null)([
-          capital.lon,
-          capital.lat,
-        ]);
-        if (projected) {
-          const fontSize = Math.max(6, Math.min(maxFontSize, 12));
-          return {
-            kanji,
-            name,
-            hiragana,
-            x: projected[0],
-            y: projected[1],
-            fontSize,
-            clip: false,
-          };
-        }
-      }
+      const capitalLabel = buildCapitalLabel(kanji, name, hiragana, pathGen, maxFontSize);
+      if (capitalLabel) return capitalLabel;
     }
 
     const layout = getPrefectureLabelLayout(feature, pathGen, name, hiragana, maxFontSize, {
       allowOutside: seaLabel,
     });
+
+    if (layout && !(layout.clip && layout.fontSize < 8)) {
+      return {
+        kanji,
+        name,
+        hiragana,
+        x: layout.x,
+        y: layout.y,
+        fontSize: layout.fontSize,
+        clip: layout.clip,
+        clipPathId: layout.clip && pathD ? `pref-clip-${mapInstanceId}-${kanji}` : undefined,
+      };
+    }
+
+    const capitalLabel = buildCapitalLabel(kanji, name, hiragana, pathGen, maxFontSize);
+    if (capitalLabel) return capitalLabel;
+
     if (!layout) return null;
+
     return {
       kanji,
       name,
