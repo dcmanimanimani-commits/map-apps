@@ -527,30 +527,73 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         <h2>🚶 アバターたんけん</h2>
       </header>
 
-      <PlayerStatus />
+      <div
+        className={`adventure-top-panel${
+          playIntro === 'goal-reveal' ? ' adventure-top-panel--reveal' : ''
+        }`}
+      >
+        <div className="adventure-top-labels">
+          <PlayerStatus />
 
-      <div className="adventure-hud">
-        <div
-          className={`adventure-goal-banner${
-            playIntro === 'goal-reveal' ? ' adventure-goal-banner--reveal' : ''
-          }`}
-        >
-          <span className="adventure-goal-eyebrow">
-            {playIntro === 'goal-reveal' ? '目的地はここ！' : 'もくてきち'}
-          </span>
-          <div className="adventure-goal-title-wrap">
-            {goalPref && (
-              <p className="adventure-goal-main">
-                <span className="adventure-goal-destination">{goalPref.kanji}へ</span>
-                <span className="adventure-goal-region">（{goalRegionLabel(goalPref.region)}）</span>
-              </p>
-            )}
-            {goalPref && (
-              <p className="adventure-goal-hiragana">県庁所在地 ◎　（{goalPref.hiragana}）</p>
+          <div className="adventure-hud">
+            <div
+              className={`adventure-goal-banner${
+                playIntro === 'goal-reveal' ? ' adventure-goal-banner--reveal' : ''
+              }`}
+            >
+              <span className="adventure-goal-eyebrow">
+                {playIntro === 'goal-reveal' ? 'ここ！' : 'もくてき'}
+              </span>
+              <div className="adventure-goal-title-wrap">
+                {goalPref && (
+                  <p className="adventure-goal-main">
+                    <span className="adventure-goal-destination">{goalPref.kanji}</span>
+                    {playIntro !== 'goal-reveal' && (
+                      <span className="adventure-goal-region">（{goalRegionLabel(goalPref.region)}）</span>
+                    )}
+                  </p>
+                )}
+                {goalPref && playIntro !== 'goal-reveal' && (
+                  <p className="adventure-goal-hiragana">◎ {goalPref.hiragana}</p>
+                )}
+              </div>
+            </div>
+            {oniActive && !oniIntro && playIntro === 'playing' && (
+              <p className="adventure-warning">👹 にげろ！</p>
             )}
           </div>
         </div>
-        {oniActive && !oniIntro && playIntro === 'playing' && <p className="adventure-warning">👹 にげろ！</p>}
+
+        {playIntro === 'goal-reveal' && goalPref && (
+          <div className="adventure-goal-study" role="status" aria-live="polite">
+            <p className="adventure-goal-study-lead">📖 おぼえよう</p>
+            <div className="adventure-goal-study-basic">
+              <p className="adventure-goal-study-name">
+                <span className="adventure-goal-study-kanji">{goalPref.kanji}</span>
+                <span className="adventure-goal-study-hira">（{goalPref.hiragana}）</span>
+              </p>
+              <p className="adventure-goal-study-region">{goalRegionLabel(goalPref.region)}</p>
+              <p className="adventure-goal-study-famous">
+                {goalPref.landmarkEmoji} {goalPref.landmark}
+              </p>
+              <p className="adventure-goal-study-capital">県庁所在地 ◎</p>
+            </div>
+            <div className="adventure-goal-study-landmarks">
+              <p className="adventure-goal-study-section-title">🍜 名物・名所</p>
+              <div className="adventure-goal-study-spots">
+                {goalLandmarkSpots.map((spot) => (
+                  <div key={spot.name} className="adventure-goal-study-spot">
+                    <span className="adventure-goal-study-spot-emoji" aria-hidden>{spot.emoji}</span>
+                    <div className="adventure-goal-study-spot-body">
+                      <p className="adventure-goal-study-spot-name">{spot.name}</p>
+                      <p className="adventure-goal-study-spot-desc">{spot.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="adventure-play-area">
@@ -649,36 +692,6 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           )}
           {playIntro === 'goal-reveal' && (
             <div className="adventure-goal-reveal-dim" aria-hidden />
-          )}
-          {playIntro === 'goal-reveal' && goalPref && (
-            <div className="adventure-goal-study" role="status" aria-live="polite">
-              <p className="adventure-goal-study-lead">📖 目的地をおぼえよう！</p>
-              <div className="adventure-goal-study-basic">
-                <p className="adventure-goal-study-name">
-                  <span className="adventure-goal-study-kanji">{goalPref.kanji}</span>
-                  <span className="adventure-goal-study-hira">（{goalPref.hiragana}）</span>
-                </p>
-                <p className="adventure-goal-study-region">{goalRegionLabel(goalPref.region)}</p>
-                <p className="adventure-goal-study-famous">
-                  {goalPref.landmarkEmoji} {goalPref.landmark}
-                </p>
-                <p className="adventure-goal-study-capital">県庁所在地 ◎ をめざそう</p>
-              </div>
-              <div className="adventure-goal-study-landmarks">
-                <p className="adventure-goal-study-section-title">🍜 名物・名所</p>
-                <div className="adventure-goal-study-spots">
-                  {goalLandmarkSpots.map((spot) => (
-                    <div key={spot.name} className="adventure-goal-study-spot">
-                      <span className="adventure-goal-study-spot-emoji" aria-hidden>{spot.emoji}</span>
-                      <div className="adventure-goal-study-spot-body">
-                        <p className="adventure-goal-study-spot-name">{spot.name}</p>
-                        <p className="adventure-goal-study-spot-desc">{spot.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           )}
           {playIntro === 'oni-reveal' && (
             <div className="adventure-oni-splash" role="status" aria-live="assertive">
