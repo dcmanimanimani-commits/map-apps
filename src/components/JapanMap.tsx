@@ -9,7 +9,7 @@ import {
   splitMainlandAndOkinawa,
   trimForRegionFocus,
 } from '../utils/geoTransform';
-import { getPrefectureLabelLayout } from '../utils/mapLabels';
+import { getPrefectureLabelLayout, getProjectedLargestRing, PREFER_INTERIOR_KANJI, type PlacedPrefectureLabel } from '../utils/mapLabels';
 import { ADVENTURE_WORLD_SCALE_W } from '../utils/mapPositions';
 import { prefectureCapitalByKanji } from '../data/prefectureCapitals';
 import {
@@ -50,6 +50,11 @@ interface JapanMapProps {
   regionFocusLandAnchor?: RegionLandAnchor;
   /** 地方ごとの微調整オフセット */
   regionFocusOffsetY?: number;
+  /** 枠内で陸地をどれだけ拡大するか */
+  regionFocusLandFill?: number;
+  /** 沖縄インセット用の確保割合 */
+  regionFocusOkinawaInsetWidthRatio?: number;
+  regionFocusOkinawaInsetHeightRatio?: number;
   renderOverlay?: (size: { width: number; height: number }) => ReactNode;
 }
 
@@ -68,6 +73,9 @@ export function JapanMap({
   regionFocusReserveOkinawaInset = false,
   regionFocusLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
   regionFocusOffsetY = 0,
+  regionFocusLandFill,
+  regionFocusOkinawaInsetWidthRatio,
+  regionFocusOkinawaInsetHeightRatio,
   renderOverlay,
 }: JapanMapProps) {
   const mapInstanceId = useId().replace(/:/g, '');
@@ -121,6 +129,9 @@ export function JapanMap({
         regionFocusPadding,
         regionFocusReserveOkinawaInset || (includesOkinawa && hasMainlandFocus),
         regionFocusLandAnchor,
+        regionFocusLandFill,
+        regionFocusOkinawaInsetWidthRatio,
+        regionFocusOkinawaInsetHeightRatio,
       )
       : createMainlandPathGenerator(mainland, width, height);
 
@@ -148,6 +159,9 @@ export function JapanMap({
     includesOkinawa,
     hasMainlandFocus,
     regionFocusLandAnchor,
+    regionFocusLandFill,
+    regionFocusOkinawaInsetWidthRatio,
+    regionFocusOkinawaInsetHeightRatio,
   ]);
 
   const okinawaFullPath = useMemo(() => {
@@ -193,16 +207,29 @@ export function JapanMap({
     pathGen: ReturnType<typeof createMainlandPathGenerator>,
     pathD: string | null,
     maxFontSize: number,
+    otherRings: [number, number][][],
+    placedLabels: PlacedPrefectureLabel[],
+    mode: 'auto' | 'interior-only' | 'sea-only' = 'auto',
+    relaxPlacedCollision = false,
   ): MapLabel | null {
     const pref = prefectureByKanji.get(kanji);
     const name = getShortKanji(kanji);
     const hiragana = pref ? getShortHiragana(kanji, pref.hiragana) : '';
     const capital = prefectureCapitalByKanji.get(kanji);
+    const preferInterior = PREFER_INTERIOR_KANJI.has(kanji);
 
     const layout = getPrefectureLabelLayout(feature, pathGen, name, hiragana, maxFontSize, {
       capital: capital ? { lon: capital.lon, lat: capital.lat } : undefined,
+      otherRings,
+      placedLabels,
+      mode,
+      relaxPlacedCollision,
+      minInteriorFontSize: preferInterior ? 5 : undefined,
+      looseInteriorFit: preferInterior,
     });
     if (!layout) return null;
+
+    const useClip = layout.clip && !(preferInterior && layout.placement === 'interior');
 
     return {
       kanji,
@@ -211,9 +238,215 @@ export function JapanMap({
       x: layout.x,
       y: layout.y,
       fontSize: layout.fontSize,
-      clip: layout.clip,
-      clipPathId: layout.clip && pathD ? `pref-clip-${mapInstanceId}-${kanji}` : undefined,
+      clip: useClip,
+      clipPathId: useClip && pathD ? `pref-clip-${mapInstanceId}-${kanji}` : undefined,
     };
+  }
+
+  function buildLabelsForPaths(
+    paths: typeof mainlandPaths,
+    fontSize: number,
+  ): MapLabel[] {
+    const ringByKanji = new Map<string, [number, number][]>();
+    for (const { kanji, pathGen, feature } of paths) {
+      const ring = getProjectedLargestRing(feature, pathGen);
+      if (ring) ringByKanji.set(kanji, ring);
+    }
+
+    const sorted = [...paths].sort((a, b) => {
+      const ringA = ringByKanji.get(a.kanji);
+      const ringB = ringByKanji.get(b.kanji);
+      const areaA = ringA ? ringAreaEstimate(ringA) : 0;
+      const areaB = ringB ? ringAreaEstimate(ringB) : 0;
+      return areaB - areaA;
+    });
+
+    const placed: PlacedPrefectureLabel[] = [];
+    const items: MapLabel[] = [];
+    const labeled = new Set<string>();
+
+    const byAreaDesc = [...sorted];
+    for (const { kanji, pathGen, feature, d } of byAreaDesc) {
+      const otherRings = [...ringByKanji.entries()]
+        .filter(([key]) => key !== kanji)
+        .map(([, ring]) => ring);
+      const preferInterior = PREFER_INTERIOR_KANJI.has(kanji);
+      const label = buildLabel(
+        kanji,
+        feature,
+        pathGen,
+        d,
+        fontSize,
+        otherRings,
+        placed,
+        'interior-only',
+        preferInterior,
+      );
+      if (!label) continue;
+      items.push(label);
+      labeled.add(kanji);
+      placed.push({
+        x: label.x,
+        y: label.y,
+        name: label.name,
+        hiragana: label.hiragana,
+        fontSize: label.fontSize,
+      });
+    }
+
+    const byAreaAsc = [...sorted].reverse();
+    for (const { kanji, pathGen, feature, d } of byAreaAsc) {
+      if (labeled.has(kanji)) continue;
+      const otherRings = [...ringByKanji.entries()]
+        .filter(([key]) => key !== kanji)
+        .map(([, ring]) => ring);
+      const preferInterior = PREFER_INTERIOR_KANJI.has(kanji);
+      let label = preferInterior
+        ? buildLabel(kanji, feature, pathGen, d, fontSize, otherRings, placed, 'interior-only', true)
+        : null;
+      if (!label) {
+        label = buildLabel(kanji, feature, pathGen, d, fontSize, otherRings, placed, 'sea-only');
+      }
+      if (!label) continue;
+      items.push(label);
+      labeled.add(kanji);
+      placed.push({
+        x: label.x,
+        y: label.y,
+        name: label.name,
+        hiragana: label.hiragana,
+        fontSize: label.fontSize,
+      });
+    }
+
+    for (const { kanji, pathGen, feature, d } of sorted) {
+      if (labeled.has(kanji)) continue;
+      const otherRings = [...ringByKanji.entries()]
+        .filter(([key]) => key !== kanji)
+        .map(([, ring]) => ring);
+      const label = buildLabel(kanji, feature, pathGen, d, fontSize, otherRings, placed, 'auto');
+      if (!label) continue;
+      items.push(label);
+      placed.push({
+        x: label.x,
+        y: label.y,
+        name: label.name,
+        hiragana: label.hiragana,
+        fontSize: label.fontSize,
+      });
+    }
+
+    const upgraded: MapLabel[] = [];
+    const upgradedPlaced: PlacedPrefectureLabel[] = [];
+    for (const label of items) {
+      if (label.clip) {
+        upgraded.push(label);
+        upgradedPlaced.push({
+          x: label.x,
+          y: label.y,
+          name: label.name,
+          hiragana: label.hiragana,
+          fontSize: label.fontSize,
+        });
+        continue;
+      }
+
+      const pathEntry = paths.find((entry) => entry.kanji === label.kanji);
+      if (!pathEntry) {
+        upgraded.push(label);
+        upgradedPlaced.push({
+          x: label.x,
+          y: label.y,
+          name: label.name,
+          hiragana: label.hiragana,
+          fontSize: label.fontSize,
+        });
+        continue;
+      }
+
+      const otherRings = [...ringByKanji.entries()]
+        .filter(([key]) => key !== label.kanji)
+        .map(([, ring]) => ring);
+      const preferInterior = PREFER_INTERIOR_KANJI.has(label.kanji);
+      const interiorLabel = buildLabel(
+        label.kanji,
+        pathEntry.feature,
+        pathEntry.pathGen,
+        pathEntry.d,
+        fontSize,
+        otherRings,
+        upgradedPlaced,
+        'interior-only',
+        true,
+      );
+
+      if (interiorLabel) {
+        upgraded.push(interiorLabel);
+        upgradedPlaced.push({
+          x: interiorLabel.x,
+          y: interiorLabel.y,
+          name: interiorLabel.name,
+          hiragana: interiorLabel.hiragana,
+          fontSize: interiorLabel.fontSize,
+        });
+      } else if (preferInterior) {
+        const forcedInterior = buildLabel(
+          label.kanji,
+          pathEntry.feature,
+          pathEntry.pathGen,
+          pathEntry.d,
+          fontSize,
+          otherRings,
+          [],
+          'interior-only',
+          true,
+        );
+        if (forcedInterior) {
+          upgraded.push(forcedInterior);
+          upgradedPlaced.push({
+            x: forcedInterior.x,
+            y: forcedInterior.y,
+            name: forcedInterior.name,
+            hiragana: forcedInterior.hiragana,
+            fontSize: forcedInterior.fontSize,
+          });
+        } else {
+          upgraded.push(label);
+          upgradedPlaced.push({
+            x: label.x,
+            y: label.y,
+            name: label.name,
+            hiragana: label.hiragana,
+            fontSize: label.fontSize,
+          });
+        }
+      } else {
+        upgraded.push(label);
+        upgradedPlaced.push({
+          x: label.x,
+          y: label.y,
+          name: label.name,
+          hiragana: label.hiragana,
+          fontSize: label.fontSize,
+        });
+      }
+    }
+
+    return upgraded;
+  }
+
+  function ringAreaEstimate(ring: [number, number][]): number {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [x, y] of ring) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    return (maxX - minX) * (maxY - minY);
   }
 
   const mainlandLabels = useMemo(() => {
@@ -228,17 +461,14 @@ export function JapanMap({
         okinawaFullPath.pathGen,
         okinawaFullPath.d,
         labelFontSize,
+        [],
+        [],
       );
       if (label) items.push(label);
       return items;
     }
 
-    for (const { kanji, pathGen, feature, d } of mainlandPaths) {
-      const label = buildLabel(kanji, feature, pathGen, d, labelFontSize);
-      if (label) items.push(label);
-    }
-
-    return items;
+    return buildLabelsForPaths(mainlandPaths, labelFontSize);
   }, [showPrefectureLabels, okinawaFullPath, mainlandPaths, labelFontSize, mapInstanceId]);
 
   const mainlandTransform = useMemo(() => {
@@ -279,14 +509,20 @@ export function JapanMap({
   const insetLabel = useMemo(() => {
     if (!showPrefectureLabels || !okinawaInset || okinawaFullPath) return null;
 
+    const otherRings = mainlandPaths
+      .map(({ feature, pathGen }) => getProjectedLargestRing(feature, pathGen))
+      .filter((ring): ring is [number, number][] => ring !== null);
+
     return buildLabel(
       OKINAWA_KANJI,
       okinawaInset.simplified,
       okinawaInset.pathGen,
       okinawaInset.d,
       insetLabelFontSize,
+      otherRings,
+      [],
     );
-  }, [showPrefectureLabels, okinawaInset, okinawaFullPath, insetLabelFontSize, mapInstanceId]);
+  }, [showPrefectureLabels, okinawaInset, okinawaFullPath, insetLabelFontSize, mapInstanceId, mainlandPaths]);
 
   function getFill(kanji: string, baseColor: string): string {
     if (correctKanji === kanji) return '#4ade80';

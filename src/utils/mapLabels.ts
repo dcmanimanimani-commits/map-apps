@@ -6,7 +6,9 @@ type Point = [number, number];
 
 const MIN_INTERIOR_FONT_SIZE = 8;
 const MIN_COMFORTABLE_INTERIOR_FONT_SIZE = 10;
-const MIN_SEA_FONT_SIZE = 6;
+const MIN_SEA_FONT_SIZE = 5;
+
+export const PREFER_INTERIOR_KANJI = new Set(['和歌山県', '鹿児島県']);
 
 function ringArea(ring: Point[]): number {
   let sum = 0;
@@ -92,8 +94,11 @@ export function polylabel(ring: Point[], precision = 0.5): Point {
   if (centroidCell.d > best.d) best = centroidCell;
 
   while (queue.length > 0) {
-    queue.sort((a, b) => b.d - a.d);
-    const cell = queue.shift()!;
+    let maxIdx = 0;
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i].d > queue[maxIdx].d) maxIdx = i;
+    }
+    const cell = queue.splice(maxIdx, 1)[0];
     if (cell.d > best.d) best = cell;
     if (cell.d - best.d <= precision) continue;
 
@@ -142,6 +147,36 @@ function largestRing(rings: Point[][]): Point[] | null {
   return best;
 }
 
+function pickLabelRing(rings: Point[][], capitalPoint: Point | null): Point[] | null {
+  if (capitalPoint) {
+    for (const ring of rings) {
+      if (pointInPolygon(capitalPoint[0], capitalPoint[1], ring)) {
+        return ring;
+      }
+    }
+  }
+  return largestRing(rings);
+}
+
+function ownRingCentroid(ring: Point[]): Point {
+  let sumX = 0;
+  let sumY = 0;
+  for (const [x, y] of ring) {
+    sumX += x;
+    sumY += y;
+  }
+  return [sumX / ring.length, sumY / ring.length];
+}
+
+function simplifyRing(ring: Point[], maxPoints = 120): Point[] {
+  if (ring.length <= maxPoints) return ring;
+  const step = Math.ceil(ring.length / maxPoints);
+  const simplified: Point[] = [];
+  for (let i = 0; i < ring.length; i += step) simplified.push(ring[i]);
+  if (simplified.length < 3) return ring.slice(0, 3);
+  return simplified;
+}
+
 function ringBounds(ring: Point[]) {
   let minX = Infinity;
   let minY = Infinity;
@@ -168,6 +203,37 @@ export interface PrefectureLabelOptions {
   capital?: { lon: number; lat: number };
   minInteriorFontSize?: number;
   minSeaFontSize?: number;
+  /** interior=陸地のみ / sea=海のみ / auto=従来 */
+  mode?: 'auto' | 'interior-only' | 'sea-only';
+  /** 陸地内に収まる場合は近接ラベルとの距離チェックを緩める */
+  relaxPlacedCollision?: boolean;
+  /** 細長い県向けに陸地内判定をやや緩める */
+  looseInteriorFit?: boolean;
+  /** 近隣県の陸地（海ラベルが重ならないよう除外） */
+  otherRings?: Point[][];
+  /** 先に配置済みのラベル（重なり回避） */
+  placedLabels?: PlacedPrefectureLabel[];
+}
+
+export interface PlacedPrefectureLabel {
+  x: number;
+  y: number;
+  name: string;
+  hiragana: string;
+  fontSize: number;
+}
+
+export function getProjectedLargestRing(
+  feature: Feature<Geometry, GeoJsonProperties>,
+  pathGen: GeoPath,
+  simplify = true,
+): Point[] | null {
+  const projection = pathGen.projection();
+  if (!projection || typeof projection !== 'function') return null;
+  const project = projection as (coords: [number, number]) => [number, number] | null;
+  const ring = largestRing(geometryToRings(feature.geometry, project));
+  if (!ring) return null;
+  return simplify ? simplifyRing(ring) : ring;
 }
 
 export function geometryToProjectedRings(
@@ -212,6 +278,53 @@ function collectLabelSamples(
   return points;
 }
 
+function collectLabelSamplesLoose(
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): Point[] {
+  const { width, height } = estimateLabelBox(name, hiragana, fontSize);
+  const halfW = width / 2 + fontSize * 0.12;
+  const halfH = height / 2 + fontSize * 0.12;
+  return [
+    [x, y],
+    [x, y - fontSize * 0.55],
+    [x, y + fontSize * 0.6],
+    [x - halfW, y - halfH],
+    [x + halfW, y - halfH],
+    [x - halfW, y + halfH],
+    [x + halfW, y + halfH],
+  ];
+}
+
+function labelFitsInsideLoose(
+  ring: Point[],
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): boolean {
+  return collectLabelSamplesLoose(x, y, name, hiragana, fontSize).every(([px, py]) =>
+    pointInPolygon(px, py, ring),
+  );
+}
+
+/** ラベルが指定した陸地と重なるか */
+export function labelOverlapsRing(
+  ring: Point[],
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): boolean {
+  return collectLabelSamples(x, y, name, hiragana, fontSize).some(([px, py]) =>
+    pointInPolygon(px, py, ring),
+  );
+}
 /** 漢字・ひらがな2行が陸地内に完全に収まるか */
 export function labelFitsInside(
   ring: Point[],
@@ -239,6 +352,81 @@ function labelFitsOutside(
   );
 }
 
+function labelClearOfRings(
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+  rings: Point[][],
+): boolean {
+  const samples = collectLabelSamples(x, y, name, hiragana, fontSize);
+  return rings.every((ring) =>
+    samples.every(([px, py]) => !pointInPolygon(px, py, ring)),
+  );
+}
+
+function labelTooCloseToPlaced(
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+  placed: PlacedPrefectureLabel[],
+): boolean {
+  const { width, height } = estimateLabelBox(name, hiragana, fontSize);
+  const ownRadius = Math.max(width, height) * 0.38;
+  for (const other of placed) {
+    const otherBox = estimateLabelBox(other.name, other.hiragana, other.fontSize);
+    const otherRadius = Math.max(otherBox.width, otherBox.height) * 0.38;
+    if (Math.hypot(x - other.x, y - other.y) < ownRadius + otherRadius) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function nearestCoastPoint(ring: Point[], target: Point): Point {
+  let best: Point = target;
+  let bestDist = Infinity;
+
+  for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+    const [ax, ay] = ring[j];
+    const [bx, by] = ring[i];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    const t = lenSq === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((target[0] - ax) * dx + (target[1] - ay) * dy) / lenSq));
+    const px = ax + dx * t;
+    const py = ay + dy * t;
+    const dist = Math.hypot(px - target[0], py - target[1]);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = [px, py];
+    }
+  }
+
+  return best;
+}
+
+function isValidSeaPlacement(
+  ownRing: Point[],
+  otherRings: Point[][],
+  placed: PlacedPrefectureLabel[],
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): boolean {
+  if (!labelFitsOutside(ownRing, x, y, name, hiragana, fontSize)) return false;
+  if (!labelClearOfRings(x, y, name, hiragana, fontSize, otherRings)) return false;
+  if (labelTooCloseToPlaced(x, y, name, hiragana, fontSize, placed)) return false;
+  return true;
+}
+
 function computeMaxFontSize(
   bounds: ReturnType<typeof ringBounds>,
   name: string,
@@ -258,44 +446,97 @@ function findInteriorLayout(
   hiragana: string,
   maxFontSize: number,
   minInteriorFontSize: number,
+  collisionRings: Point[][] = [],
+  placedLabels: PlacedPrefectureLabel[] = [],
+  relaxPlacedCollision = false,
+  looseInteriorFit = false,
 ): PrefectureLabelLayout | null {
   const bounds = ringBounds(ring);
   const startFontSize = Math.floor(computeMaxFontSize(bounds, name, hiragana, maxFontSize));
+  const state: { best: PrefectureLabelLayout | null; depth: number } = { best: null, depth: -1 };
+
+  const consider = (x: number, y: number, fontSize: number) => {
+    if (!pointInPolygon(x, y, ring)) return;
+    const fits = looseInteriorFit
+      ? labelFitsInsideLoose(ring, x, y, name, hiragana, fontSize)
+      : labelFitsInside(ring, x, y, name, hiragana, fontSize);
+    if (!fits) return;
+    if (!labelClearOfRings(x, y, name, hiragana, fontSize, collisionRings)) return;
+    if (
+      !relaxPlacedCollision &&
+      labelTooCloseToPlaced(x, y, name, hiragana, fontSize, placedLabels)
+    ) {
+      return;
+    }
+    const depth = distToRing(x, y, ring);
+    if (depth > state.depth) {
+      state.depth = depth;
+      state.best = { x, y, fontSize, clip: true, placement: 'interior' };
+    }
+  };
 
   for (let fontSize = startFontSize; fontSize >= minInteriorFontSize; fontSize--) {
-    const maxShift = fontSize * 1.5;
+    const maxShift = fontSize * 2.2;
+    const gridStep = Math.max(fontSize * 0.55, 3);
     for (const [x, y] of candidates) {
       for (let yShift = 0; yShift <= maxShift; yShift += fontSize * 0.1) {
-        const ty = y + yShift;
-        if (!pointInPolygon(x, ty, ring)) continue;
-        if (labelFitsInside(ring, x, ty, name, hiragana, fontSize)) {
-          return { x, y: ty, fontSize, clip: true, placement: 'interior' };
+        consider(x, y + yShift, fontSize);
+      }
+      for (let ox = -fontSize * 1.2; ox <= fontSize * 1.2; ox += gridStep) {
+        for (let oy = -fontSize * 1.2; oy <= fontSize * 2.2; oy += gridStep) {
+          consider(x + ox, y + oy, fontSize);
         }
       }
     }
+    if (state.best) return state.best;
   }
 
-  return null;
+  return state.best;
+}
+
+function coastOutwardNormals(ring: Point[], coast: Point): Point[] {
+  let bestDist = Infinity;
+  let bestSeg: [Point, Point] | null = null;
+
+  for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+    const a: Point = ring[j];
+    const b: Point = ring[i];
+    const d = pointToSegmentDist(coast[0], coast[1], a[0], a[1], b[0], b[1]);
+    if (d < bestDist) {
+      bestDist = d;
+      bestSeg = [a, b];
+    }
+  }
+
+  if (!bestSeg) return [];
+  const [a, b] = bestSeg;
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  if (len < 0.01) return [];
+  return [[-dy / len, dx / len], [dy / len, -dx / len]];
 }
 
 function buildSeaLayout(
-  ring: Point[],
-  project: (coords: [number, number]) => [number, number] | null,
+  ownRing: Point[],
+  otherRings: Point[][],
+  placed: PlacedPrefectureLabel[],
   capital: { lon: number; lat: number },
   name: string,
   hiragana: string,
   maxFontSize: number,
   minSeaFontSize: number,
-  interiorAnchor: Point,
+  _interiorAnchor: Point,
+  project: (coords: [number, number]) => [number, number] | null,
 ): PrefectureLabelLayout | null {
   const projected = project([capital.lon, capital.lat]);
   if (!projected) return null;
 
-  const fontSize = Math.max(minSeaFontSize, Math.min(maxFontSize, 12));
-  const ringCx = ring.reduce((sum, [x]) => sum + x, 0) / ring.length;
-  const ringCy = ring.reduce((sum, [, y]) => sum + y, 0) / ring.length;
-  const bounds = ringBounds(ring);
+  const ringCx = ownRing.reduce((sum, [x]) => sum + x, 0) / ownRing.length;
+  const ringCy = ownRing.reduce((sum, [, y]) => sum + y, 0) / ownRing.length;
+  const bounds = ringBounds(ownRing);
   const maxPush = Math.max(bounds.width, bounds.height) * 1.15;
+  const coast = nearestCoastPoint(ownRing, projected);
 
   const directions: Point[] = [];
   const addDirection = (dx: number, dy: number) => {
@@ -303,35 +544,71 @@ function buildSeaLayout(
     if (len > 0.01) directions.push([dx / len, dy / len]);
   };
 
+  addDirection(coast[0] - ringCx, coast[1] - ringCy);
   addDirection(projected[0] - ringCx, projected[1] - ringCy);
-  addDirection(projected[0] - interiorAnchor[0], projected[1] - interiorAnchor[1]);
-  for (let i = 0; i < 16; i++) {
-    const angle = (i * Math.PI) / 8;
+  for (const normal of coastOutwardNormals(ownRing, coast)) addDirection(normal[0], normal[1]);
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
     addDirection(Math.cos(angle), Math.sin(angle));
   }
 
-  const origins: Point[] = [projected, interiorAnchor];
-  for (const [ox, oy] of origins) {
-    for (const [dx, dy] of directions) {
-      for (let dist = fontSize * 0.25; dist <= maxPush; dist += fontSize * 0.35) {
-        for (const yBias of [0, fontSize * 0.25, fontSize * 0.5]) {
-          const x = ox + dx * dist;
-          const y = oy + dy * dist + yBias;
-          if (labelFitsOutside(ring, x, y, name, hiragana, fontSize)) {
-            return { x, y, fontSize, clip: false, placement: 'sea' };
-          }
+  const origins: Point[] = [coast, projected];
+  type SeaCandidate = { x: number; y: number; fontSize: number; score: number };
+  const state: { best: SeaCandidate | null } = { best: null };
+
+  const tryCandidate = (x: number, y: number, fontSize: number, score: number) => {
+    if (!isValidSeaPlacement(ownRing, otherRings, placed, x, y, name, hiragana, fontSize)) return;
+    if (!state.best || score < state.best.score) {
+      state.best = { x, y, fontSize, score };
+    }
+  };
+
+  const fontSizes = [Math.min(maxFontSize, 11), 9, 8, 7, minSeaFontSize]
+    .filter((value, index, list) => list.indexOf(value) === index)
+    .sort((a, b) => b - a);
+
+  for (const fontSize of fontSizes) {
+    const step = Math.max(fontSize * 0.4, 2.5);
+    const distSteps = Math.min(12, Math.ceil(maxPush / step));
+    for (const [ox, oy] of origins) {
+      for (const [dx, dy] of directions) {
+        for (let di = 1; di <= distSteps; di++) {
+          const dist = di * step;
+          tryCandidate(
+            ox + dx * dist,
+            oy + dy * dist,
+            fontSize,
+            Math.hypot(ox + dx * dist - projected[0], oy + dy * dist - projected[1]) + dist * 0.1,
+          );
         }
       }
     }
+    if (state.best) break;
   }
 
-  return {
-    x: projected[0],
-    y: projected[1],
-    fontSize,
-    clip: false,
-    placement: 'sea',
-  };
+  if (!state.best) {
+    const searchRadius = Math.max(bounds.width, bounds.height) * 1.1;
+    for (const fontSize of fontSizes) {
+      const step = Math.max(fontSize * 0.75, 4);
+      for (let gx = projected[0] - searchRadius; gx <= projected[0] + searchRadius; gx += step) {
+        for (let gy = projected[1] - searchRadius; gy <= projected[1] + searchRadius; gy += step) {
+          tryCandidate(
+            gx,
+            gy,
+            fontSize,
+            Math.hypot(gx - projected[0], gy - projected[1]),
+          );
+        }
+      }
+      if (state.best) break;
+    }
+  }
+
+  if (state.best) {
+    return { x: state.best.x, y: state.best.y, fontSize: state.best.fontSize, clip: false, placement: 'sea' };
+  }
+
+  return null;
 }
 
 export function getPrefectureLabelLayout(
@@ -347,50 +624,109 @@ export function getPrefectureLabelLayout(
 
   const project = projection as (coords: [number, number]) => [number, number] | null;
   const rings = geometryToRings(feature.geometry, project);
-  const ring = largestRing(rings);
+  const capitalPoint = options?.capital
+    ? project([options.capital.lon, options.capital.lat])
+    : null;
+  const ring = pickLabelRing(rings, capitalPoint);
   if (!ring) return null;
 
   const minInteriorFontSize = options?.minInteriorFontSize ?? MIN_INTERIOR_FONT_SIZE;
   const minSeaFontSize = options?.minSeaFontSize ?? MIN_SEA_FONT_SIZE;
   const bounds = ringBounds(ring);
-  const precision = Math.max(0.25, Math.min(bounds.width, bounds.height) * 0.02);
+  const otherRings = options?.otherRings ?? [];
+  const collisionRings = otherRings.map((otherRing) => simplifyRing(otherRing));
+  const placedLabels = options?.placedLabels ?? [];
+  const mode = options?.mode ?? 'auto';
 
+  if (mode === 'sea-only' && options?.capital) {
+    const interiorAnchor: Point = capitalPoint ?? ownRingCentroid(ring);
+    return buildSeaLayout(
+      ring,
+      collisionRings,
+      placedLabels,
+      options.capital,
+      name,
+      hiragana,
+      maxFontSize,
+      minSeaFontSize,
+      interiorAnchor,
+      project,
+    );
+  }
+
+  const precision = Math.max(0.25, Math.min(bounds.width, bounds.height) * 0.02);
   const [interiorAnchorX, interiorAnchorY] = polylabel(ring, precision);
 
   const candidates: Point[] = [[interiorAnchorX, interiorAnchorY]];
   const centroid = project(geoCentroid(feature) as [number, number]);
   if (centroid) candidates.push(centroid);
-  if (options?.capital) {
-    const capitalPoint = project([options.capital.lon, options.capital.lat]);
-    if (capitalPoint) candidates.push(capitalPoint);
-  }
+  if (capitalPoint) candidates.push(capitalPoint);
 
-  const interior = findInteriorLayout(
-    ring,
-    candidates,
-    name,
-    hiragana,
-    maxFontSize,
-    minInteriorFontSize,
-  );
-  if (interior && interior.fontSize >= MIN_COMFORTABLE_INTERIOR_FONT_SIZE) {
-    return interior;
-  }
-
-  if (options?.capital) {
-    return buildSeaLayout(
+  const interior = mode === 'interior-only' || mode === 'auto'
+    ? findInteriorLayout(
       ring,
-      project,
+      candidates,
+      name,
+      hiragana,
+      maxFontSize,
+      minInteriorFontSize,
+      collisionRings,
+      placedLabels,
+      options?.relaxPlacedCollision ?? false,
+      options?.looseInteriorFit ?? false,
+    )
+    : null;
+
+  const interiorIsValid = (layout: PrefectureLabelLayout) =>
+    labelClearOfRings(layout.x, layout.y, name, hiragana, layout.fontSize, collisionRings) &&
+    (options?.relaxPlacedCollision ||
+      !labelTooCloseToPlaced(layout.x, layout.y, name, hiragana, layout.fontSize, placedLabels));
+
+  if (mode !== 'sea-only' && interior && interiorIsValid(interior)) {
+    if (
+      mode === 'interior-only' ||
+      options?.relaxPlacedCollision ||
+      interior.fontSize >= MIN_COMFORTABLE_INTERIOR_FONT_SIZE
+    ) {
+      return interior;
+    }
+  }
+
+  if (mode !== 'interior-only' && options?.capital) {
+    const sea = buildSeaLayout(
+      ring,
+      collisionRings,
+      placedLabels,
       options.capital,
       name,
       hiragana,
       maxFontSize,
       minSeaFontSize,
       [interiorAnchorX, interiorAnchorY],
+      project,
     );
+    if (sea) return sea;
   }
 
-  if (interior) return interior;
+  if (mode !== 'sea-only' && interior && interiorIsValid(interior)) {
+    return interior;
+  }
+
+  if (mode !== 'interior-only' && options?.capital) {
+    const desperateSea = buildSeaLayout(
+      ring,
+      collisionRings,
+      [],
+      options.capital,
+      name,
+      hiragana,
+      maxFontSize,
+      minSeaFontSize,
+      capitalPoint ?? ownRingCentroid(ring),
+      project,
+    );
+    if (desperateSea) return desperateSea;
+  }
 
   return null;
 }

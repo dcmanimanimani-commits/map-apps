@@ -192,6 +192,9 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
             regionFocusPadding={regionMapTuning.padding}
             regionFocusOffsetY={regionMapTuning.offsetY}
             regionFocusReserveOkinawaInset={regionMapTuning.reserveOkinawaInset}
+            regionFocusLandFill={regionMapTuning.landFill}
+            regionFocusOkinawaInsetWidthRatio={regionMapTuning.okinawaInsetWidthRatio}
+            regionFocusOkinawaInsetHeightRatio={regionMapTuning.okinawaInsetHeightRatio}
             onPrefectureClick={handleLearnTap}
             interactive
           />
@@ -233,6 +236,9 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
           regionFocusPadding={regionMapTuning.padding}
           regionFocusOffsetY={regionMapTuning.offsetY}
           regionFocusReserveOkinawaInset={regionMapTuning.reserveOkinawaInset}
+          regionFocusLandFill={regionMapTuning.landFill}
+          regionFocusOkinawaInsetWidthRatio={regionMapTuning.okinawaInsetWidthRatio}
+          regionFocusOkinawaInsetHeightRatio={regionMapTuning.okinawaInsetHeightRatio}
           interactive={!locked}
         />
       </div>

@@ -41,6 +41,8 @@ function getFitBox(
   padding: number,
   reserveOkinawaInset: boolean,
   landAnchor: RegionLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
+  okinawaInsetWidthRatio = 0.36,
+  okinawaInsetHeightRatio = 0.32,
 ): RegionFitBox {
   const x1 = padding;
   const y1 = padding;
@@ -48,9 +50,16 @@ function getFitBox(
   const y2 = height - padding;
 
   if (reserveOkinawaInset) {
-    const corner = getOkinawaCorner(width, height);
-    const insetX2 = Math.max(x1 + 56, corner.x - padding);
-    const insetY2 = Math.max(y1 + 56, corner.y - padding);
+    const corner = getOkinawaCorner(
+      width,
+      height,
+      okinawaInsetWidthRatio,
+      okinawaInsetHeightRatio,
+      Math.min(88, width * okinawaInsetWidthRatio),
+      Math.min(72, height * okinawaInsetHeightRatio),
+    );
+    const insetX2 = Math.max(x1 + 16, corner.x - padding);
+    const insetY2 = Math.max(y1 + 16, corner.y - padding);
     return {
       x1,
       y1,
@@ -140,9 +149,16 @@ function normalizeRegionLandFit(
 }
 
 /** L字区切りの角（画面右下の沖縄エリア） */
-export function getOkinawaCorner(width: number, height: number) {
-  const insetW = Math.max(width * 0.36, 150);
-  const insetH = Math.max(height * 0.32, 120);
+export function getOkinawaCorner(
+  width: number,
+  height: number,
+  widthRatio = 0.36,
+  heightRatio = 0.32,
+  minWidth = 150,
+  minHeight = 120,
+) {
+  const insetW = Math.max(width * widthRatio, minWidth);
+  const insetH = Math.max(height * heightRatio, minHeight);
   return {
     x: width - insetW,
     y: height - insetH,
@@ -176,16 +192,27 @@ export function createRegionFocusPathGenerator(
   padding = 2,
   reserveOkinawaInset = false,
   landAnchor: RegionLandAnchor = REGION_LAND_ANCHOR_DEFAULT,
+  landFill = REGION_LAND_FILL,
+  okinawaInsetWidthRatio = 0.36,
+  okinawaInsetHeightRatio = 0.32,
 ): GeoPath {
   const fitGeo = trimForRegionFocus(regionGeo);
-  const fitBox = getFitBox(width, height, padding, reserveOkinawaInset, landAnchor);
+  const fitBox = getFitBox(
+    width,
+    height,
+    padding,
+    reserveOkinawaInset,
+    landAnchor,
+    okinawaInsetWidthRatio,
+    okinawaInsetHeightRatio,
+  );
 
   const projection = geoMercator().fitExtent(
     [[fitBox.x1, fitBox.y1], [fitBox.x2, fitBox.y2]],
     fitGeo,
   );
 
-  return normalizeRegionLandFit(projection, fitGeo, fitBox, REGION_LAND_FILL);
+  return normalizeRegionLandFit(projection, fitGeo, fitBox, landFill);
 }
 
 /** 沖縄のみ表示：画面いっぱいにフィット */

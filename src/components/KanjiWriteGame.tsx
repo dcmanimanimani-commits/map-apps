@@ -351,6 +351,9 @@ export function KanjiWriteGame({ geo, onBack }: KanjiWriteGameProps) {
               regionFocusPadding={regionMapTuning.padding}
               regionFocusOffsetY={regionMapTuning.offsetY}
               regionFocusReserveOkinawaInset={regionMapTuning.reserveOkinawaInset}
+              regionFocusLandFill={regionMapTuning.landFill}
+              regionFocusOkinawaInsetWidthRatio={regionMapTuning.okinawaInsetWidthRatio}
+              regionFocusOkinawaInsetHeightRatio={regionMapTuning.okinawaInsetHeightRatio}
               interactive={false}
             />
           </div>

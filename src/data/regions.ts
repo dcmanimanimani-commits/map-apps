@@ -10,6 +10,12 @@ export interface RegionMapTuning {
   padding: number;
   offsetY: number;
   reserveOkinawaInset?: boolean;
+  /** 枠内で陸地をどれだけ拡大するか（1より大きいとより大きく） */
+  landFill?: number;
+  /** 沖縄インセット用に確保する横幅の割合 */
+  okinawaInsetWidthRatio?: number;
+  /** 沖縄インセット用に確保する縦幅の割合 */
+  okinawaInsetHeightRatio?: number;
 }
 
 export const studyRegions: StudyRegion[] = [
@@ -83,7 +89,14 @@ const REGION_MAP_TUNING: Record<string, RegionMapTuning> = {
   kinki: { padding: 7, offsetY: 4 },
   chugoku: { padding: 1, offsetY: 0 },
   shikoku: { padding: 7, offsetY: 4 },
-  kyushu: { padding: 0, offsetY: 12, reserveOkinawaInset: true },
+  kyushu: {
+    padding: 0,
+    offsetY: 0,
+    reserveOkinawaInset: true,
+    landFill: 1.2,
+    okinawaInsetWidthRatio: 0.18,
+    okinawaInsetHeightRatio: 0.15,
+  },
 };
 
 export function getRegionMapTuning(id: string): RegionMapTuning {
