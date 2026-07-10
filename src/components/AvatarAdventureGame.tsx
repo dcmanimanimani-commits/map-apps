@@ -60,6 +60,20 @@ function isMainlandStartPrefecture(pref: Prefecture): boolean {
   return START_REGIONS.has(pref.region);
 }
 
+function maxCapitalDistance(capitals: Map<string, MapPoint>): number {
+  const points = [...capitals.values()];
+  let max = 0;
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      max = Math.max(max, mapDistance(points[i], points[j]));
+    }
+  }
+  return max;
+}
+
+/** 出発地と目的地の距離が十分離れるよう選ぶ（最大距離の一定割合以上） */
+const MIN_START_GOAL_DIST_RATIO = 0.5;
+
 function pickStartAndGoal(capitals: Map<string, MapPoint>): {
   start: Prefecture;
   goal: Prefecture;
@@ -67,14 +81,77 @@ function pickStartAndGoal(capitals: Map<string, MapPoint>): {
   goalPos: MapPoint;
 } {
   const available = prefectures.filter((p) => capitals.has(p.kanji));
-  const goal = available[Math.floor(Math.random() * available.length)];
-  const startPool = available.filter((p) => p.kanji !== goal.kanji && isMainlandStartPrefecture(p));
-  const start = startPool[Math.floor(Math.random() * startPool.length)] ?? available.find((p) => p.kanji !== goal.kanji)!;
+  const startPool = available.filter(isMainlandStartPrefecture);
+  const maxDist = maxCapitalDistance(capitals);
+
+  const collectPairs = (minRatio: number) => {
+    const minDist = maxDist * minRatio;
+    const pairs: {
+      start: Prefecture;
+      goal: Prefecture;
+      startPos: MapPoint;
+      goalPos: MapPoint;
+      dist: number;
+    }[] = [];
+
+    for (const goal of available) {
+      const goalPos = capitals.get(goal.kanji)!;
+      for (const start of startPool) {
+        if (start.kanji === goal.kanji) continue;
+        const startPos = capitals.get(start.kanji)!;
+        const dist = mapDistance(startPos, goalPos);
+        if (dist >= minDist) {
+          pairs.push({ start, goal, startPos, goalPos, dist });
+        }
+      }
+    }
+    return pairs;
+  };
+
+  const farPairs = collectPairs(MIN_START_GOAL_DIST_RATIO);
+  const pool = farPairs.length > 0 ? farPairs : collectPairs(0.35);
+  if (pool.length > 0) {
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    return {
+      start: picked.start,
+      goal: picked.goal,
+      startPos: picked.startPos,
+      goalPos: picked.goalPos,
+    };
+  }
+
+  let best: {
+    start: Prefecture;
+    goal: Prefecture;
+    startPos: MapPoint;
+    goalPos: MapPoint;
+    dist: number;
+  } | null = null;
+
+  for (const goal of available) {
+    const goalPos = capitals.get(goal.kanji)!;
+    for (const start of startPool) {
+      if (start.kanji === goal.kanji) continue;
+      const startPos = capitals.get(start.kanji)!;
+      const dist = mapDistance(startPos, goalPos);
+      if (!best || dist > best.dist) {
+        best = { start, goal, startPos, goalPos, dist };
+      }
+    }
+  }
+
+  const fallback = best ?? {
+    start: startPool[0],
+    goal: available.find((p) => p.kanji !== startPool[0].kanji)!,
+    startPos: capitals.get(startPool[0].kanji)!,
+    goalPos: capitals.get(available.find((p) => p.kanji !== startPool[0].kanji)!.kanji)!,
+  };
+
   return {
-    start,
-    goal,
-    startPos: capitals.get(start.kanji)!,
-    goalPos: capitals.get(goal.kanji)!,
+    start: fallback.start,
+    goal: fallback.goal,
+    startPos: fallback.startPos,
+    goalPos: fallback.goalPos,
   };
 }
 
