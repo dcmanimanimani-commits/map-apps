@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JapanGeoJSON } from '../hooks/useJapanGeo';
 import { useMapSize } from '../hooks/useMapSize';
 import { prefectures, type Prefecture } from '../data/prefectures';
+import { getLandmarkSpots } from '../data/landmarkDetails';
 import { usePlayer } from '../context/PlayerContext';
 import { BOSS_IMAGE, type AvatarLevel } from '../data/characterAssets';
 import { resolveAvatarLevel } from '../data/progress';
@@ -37,12 +38,12 @@ interface AvatarAdventureGameProps {
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 type PlayIntro = 'goal-reveal' | 'oni-reveal' | 'playing';
 
-const ONI_SPEED = 6.75;
+const ONI_SPEED = 5.4;
 const MINION_COUNT = 10;
 /** 小さい鬼は大王よりゆっくり（とことこ） */
-const MINION_SPEEDS = [3.6, 3.9, 4.2, 4.5, 4.8, 5.1, 5.4, 5.7, 6.0, 6.3] as const;
+const MINION_SPEEDS = [2.88, 3.12, 3.36, 3.6, 3.84, 4.08, 4.32, 4.56, 4.8, 5.04] as const;
 const ONI_INTRO_MS = 1000;
-const GOAL_REVEAL_MS = 4800;
+const GOAL_REVEAL_MS = 8000;
 const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
 const CHAR_SIZE = 152;
@@ -155,6 +156,11 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     if (viewW < 200) return Math.round(26 * 0.8);
     return Math.round(Math.max(24, Math.min(42, viewW * 0.058)) * 0.8);
   }, [viewW]);
+
+  const goalLandmarkSpots = useMemo(
+    () => (goalPref ? getLandmarkSpots(goalPref.kanji) : []),
+    [goalPref],
+  );
 
   const displayCamera = useMemo(() => {
     if (playIntro === 'playing') {
@@ -643,6 +649,36 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           )}
           {playIntro === 'goal-reveal' && (
             <div className="adventure-goal-reveal-dim" aria-hidden />
+          )}
+          {playIntro === 'goal-reveal' && goalPref && (
+            <div className="adventure-goal-study" role="status" aria-live="polite">
+              <p className="adventure-goal-study-lead">📖 目的地をおぼえよう！</p>
+              <div className="adventure-goal-study-basic">
+                <p className="adventure-goal-study-name">
+                  <span className="adventure-goal-study-kanji">{goalPref.kanji}</span>
+                  <span className="adventure-goal-study-hira">（{goalPref.hiragana}）</span>
+                </p>
+                <p className="adventure-goal-study-region">{goalRegionLabel(goalPref.region)}</p>
+                <p className="adventure-goal-study-famous">
+                  {goalPref.landmarkEmoji} {goalPref.landmark}
+                </p>
+                <p className="adventure-goal-study-capital">県庁所在地 ◎ をめざそう</p>
+              </div>
+              <div className="adventure-goal-study-landmarks">
+                <p className="adventure-goal-study-section-title">🍜 名物・名所</p>
+                <div className="adventure-goal-study-spots">
+                  {goalLandmarkSpots.map((spot) => (
+                    <div key={spot.name} className="adventure-goal-study-spot">
+                      <span className="adventure-goal-study-spot-emoji" aria-hidden>{spot.emoji}</span>
+                      <div className="adventure-goal-study-spot-body">
+                        <p className="adventure-goal-study-spot-name">{spot.name}</p>
+                        <p className="adventure-goal-study-spot-desc">{spot.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
           {playIntro === 'oni-reveal' && (
             <div className="adventure-oni-splash" role="status" aria-live="assertive">
