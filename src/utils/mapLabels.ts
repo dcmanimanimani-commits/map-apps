@@ -184,15 +184,14 @@ function estimateLabelBox(name: string, hiragana: string, fontSize: number) {
   };
 }
 
-/** 漢字・ひらがな2行が陸地内に完全に収まるか */
-export function labelFitsInside(
-  ring: Point[],
+/** 漢字・ひらがな2行のサンプル点 */
+function collectLabelSamples(
   x: number,
   y: number,
   name: string,
   hiragana: string,
   fontSize: number,
-): boolean {
+): Point[] {
   const { width } = estimateLabelBox(name, hiragana, fontSize);
   const halfW = width / 2;
   const kanjiY = y - fontSize * 0.55;
@@ -200,7 +199,7 @@ export function labelFitsInside(
   const top = Math.min(kanjiY, hiraY) - fontSize * 0.15;
   const bottom = Math.max(kanjiY, hiraY) + fontSize * 0.15;
 
-  const samples: Point[] = [
+  return [
     [x, y],
     [x - halfW, kanjiY],
     [x + halfW, kanjiY],
@@ -211,8 +210,33 @@ export function labelFitsInside(
     [x - halfW, y],
     [x + halfW, y],
   ];
+}
 
-  return samples.every(([px, py]) => pointInPolygon(px, py, ring));
+/** 漢字・ひらがな2行が陸地内に完全に収まるか */
+export function labelFitsInside(
+  ring: Point[],
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): boolean {
+  return collectLabelSamples(x, y, name, hiragana, fontSize).every(([px, py]) =>
+    pointInPolygon(px, py, ring),
+  );
+}
+
+function labelFitsOutside(
+  ring: Point[],
+  x: number,
+  y: number,
+  name: string,
+  hiragana: string,
+  fontSize: number,
+): boolean {
+  return collectLabelSamples(x, y, name, hiragana, fontSize).every(
+    ([px, py]) => !pointInPolygon(px, py, ring),
+  );
 }
 
 function computeMaxFontSize(
@@ -251,15 +275,50 @@ function findInteriorLayout(
 }
 
 function buildSeaLayout(
+  ring: Point[],
   project: (coords: [number, number]) => [number, number] | null,
   capital: { lon: number; lat: number },
+  name: string,
+  hiragana: string,
   maxFontSize: number,
   minSeaFontSize: number,
+  interiorAnchor: Point,
 ): PrefectureLabelLayout | null {
   const projected = project([capital.lon, capital.lat]);
   if (!projected) return null;
 
   const fontSize = Math.max(minSeaFontSize, Math.min(maxFontSize, 12));
+  const ringCx = ring.reduce((sum, [x]) => sum + x, 0) / ring.length;
+  const ringCy = ring.reduce((sum, [, y]) => sum + y, 0) / ring.length;
+  const bounds = ringBounds(ring);
+  const maxPush = Math.max(bounds.width, bounds.height) * 1.15;
+
+  const directions: Point[] = [];
+  const addDirection = (dx: number, dy: number) => {
+    const len = Math.hypot(dx, dy);
+    if (len > 0.01) directions.push([dx / len, dy / len]);
+  };
+
+  addDirection(projected[0] - ringCx, projected[1] - ringCy);
+  addDirection(projected[0] - interiorAnchor[0], projected[1] - interiorAnchor[1]);
+  for (let i = 0; i < 16; i++) {
+    const angle = (i * Math.PI) / 8;
+    addDirection(Math.cos(angle), Math.sin(angle));
+  }
+
+  const origins: Point[] = [projected, interiorAnchor];
+  for (const [ox, oy] of origins) {
+    for (const [dx, dy] of directions) {
+      for (let dist = fontSize * 0.25; dist <= maxPush; dist += fontSize * 0.35) {
+        const x = ox + dx * dist;
+        const y = oy + dy * dist;
+        if (labelFitsOutside(ring, x, y, name, hiragana, fontSize)) {
+          return { x, y, fontSize, clip: false, placement: 'sea' };
+        }
+      }
+    }
+  }
+
   return {
     x: projected[0],
     y: projected[1],
@@ -290,7 +349,9 @@ export function getPrefectureLabelLayout(
   const bounds = ringBounds(ring);
   const precision = Math.max(0.25, Math.min(bounds.width, bounds.height) * 0.02);
 
-  const candidates: Point[] = [polylabel(ring, precision)];
+  const [interiorAnchorX, interiorAnchorY] = polylabel(ring, precision);
+
+  const candidates: Point[] = [[interiorAnchorX, interiorAnchorY]];
   const centroid = project(geoCentroid(feature) as [number, number]);
   if (centroid) candidates.push(centroid);
   if (options?.capital) {
@@ -309,7 +370,16 @@ export function getPrefectureLabelLayout(
   if (interior) return interior;
 
   if (options?.capital) {
-    return buildSeaLayout(project, options.capital, maxFontSize, minSeaFontSize);
+    return buildSeaLayout(
+      ring,
+      project,
+      options.capital,
+      name,
+      hiragana,
+      maxFontSize,
+      minSeaFontSize,
+      [interiorAnchorX, interiorAnchorY],
+    );
   }
 
   return null;
