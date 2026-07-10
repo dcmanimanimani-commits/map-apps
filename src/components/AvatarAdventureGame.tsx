@@ -37,10 +37,10 @@ interface AvatarAdventureGameProps {
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 type PlayIntro = 'goal-reveal' | 'oni-reveal' | 'playing';
 
-const ONI_SPEED = 8.4375;
+const ONI_SPEED = 6.75;
 const MINION_COUNT = 10;
 /** 小さい鬼は大王よりゆっくり（とことこ） */
-const MINION_SPEEDS = [4.5, 4.875, 5.25, 5.625, 6.0, 6.375, 6.75, 7.125, 7.5, 7.875] as const;
+const MINION_SPEEDS = [3.6, 3.9, 4.2, 4.5, 4.8, 5.1, 5.4, 5.7, 6.0, 6.3] as const;
 const ONI_INTRO_MS = 1000;
 const GOAL_REVEAL_MS = 4800;
 const ARRIVE_RADIUS = 34;
