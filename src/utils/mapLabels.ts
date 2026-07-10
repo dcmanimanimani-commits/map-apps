@@ -5,6 +5,7 @@ import { geoCentroid } from 'd3-geo';
 type Point = [number, number];
 
 const MIN_INTERIOR_FONT_SIZE = 8;
+const MIN_COMFORTABLE_INTERIOR_FONT_SIZE = 10;
 const MIN_SEA_FONT_SIZE = 6;
 
 function ringArea(ring: Point[]): number {
@@ -193,23 +194,22 @@ function collectLabelSamples(
   fontSize: number,
 ): Point[] {
   const { width } = estimateLabelBox(name, hiragana, fontSize);
-  const halfW = width / 2;
-  const kanjiY = y - fontSize * 0.55;
-  const hiraY = y + fontSize * 0.6;
-  const top = Math.min(kanjiY, hiraY) - fontSize * 0.15;
-  const bottom = Math.max(kanjiY, hiraY) + fontSize * 0.15;
+  const halfW = width / 2 + fontSize * 0.3;
+  const strokePad = fontSize * 0.32;
+  const kanjiMidY = y - fontSize * 0.55;
+  const hiraMidY = y + fontSize * 0.6;
+  const kanjiTop = kanjiMidY - fontSize * 0.62 - strokePad;
+  const kanjiBottom = kanjiMidY + fontSize * 0.5 + strokePad;
+  const hiraTop = hiraMidY - fontSize * 0.55 - strokePad;
+  const hiraBottom = hiraMidY + fontSize * 0.55 + strokePad;
 
-  return [
-    [x, y],
-    [x - halfW, kanjiY],
-    [x + halfW, kanjiY],
-    [x - halfW, hiraY],
-    [x + halfW, hiraY],
-    [x, top],
-    [x, bottom],
-    [x - halfW, y],
-    [x + halfW, y],
-  ];
+  const points: Point[] = [];
+  for (const lineY of [kanjiTop, kanjiMidY, kanjiBottom, hiraTop, hiraMidY, hiraBottom]) {
+    for (const lineX of [x - halfW, x, x + halfW]) {
+      points.push([lineX, lineY]);
+    }
+  }
+  return points;
 }
 
 /** 漢字・ひらがな2行が陸地内に完全に収まるか */
@@ -262,11 +262,15 @@ function findInteriorLayout(
   const bounds = ringBounds(ring);
   const startFontSize = Math.floor(computeMaxFontSize(bounds, name, hiragana, maxFontSize));
 
-  for (const [x, y] of candidates) {
-    if (!pointInPolygon(x, y, ring)) continue;
-    for (let fontSize = startFontSize; fontSize >= minInteriorFontSize; fontSize--) {
-      if (labelFitsInside(ring, x, y, name, hiragana, fontSize)) {
-        return { x, y, fontSize, clip: true, placement: 'interior' };
+  for (let fontSize = startFontSize; fontSize >= minInteriorFontSize; fontSize--) {
+    const maxShift = fontSize * 1.5;
+    for (const [x, y] of candidates) {
+      for (let yShift = 0; yShift <= maxShift; yShift += fontSize * 0.1) {
+        const ty = y + yShift;
+        if (!pointInPolygon(x, ty, ring)) continue;
+        if (labelFitsInside(ring, x, ty, name, hiragana, fontSize)) {
+          return { x, y: ty, fontSize, clip: true, placement: 'interior' };
+        }
       }
     }
   }
@@ -310,10 +314,12 @@ function buildSeaLayout(
   for (const [ox, oy] of origins) {
     for (const [dx, dy] of directions) {
       for (let dist = fontSize * 0.25; dist <= maxPush; dist += fontSize * 0.35) {
-        const x = ox + dx * dist;
-        const y = oy + dy * dist;
-        if (labelFitsOutside(ring, x, y, name, hiragana, fontSize)) {
-          return { x, y, fontSize, clip: false, placement: 'sea' };
+        for (const yBias of [0, fontSize * 0.25, fontSize * 0.5]) {
+          const x = ox + dx * dist;
+          const y = oy + dy * dist + yBias;
+          if (labelFitsOutside(ring, x, y, name, hiragana, fontSize)) {
+            return { x, y, fontSize, clip: false, placement: 'sea' };
+          }
         }
       }
     }
@@ -367,7 +373,9 @@ export function getPrefectureLabelLayout(
     maxFontSize,
     minInteriorFontSize,
   );
-  if (interior) return interior;
+  if (interior && interior.fontSize >= MIN_COMFORTABLE_INTERIOR_FONT_SIZE) {
+    return interior;
+  }
 
   if (options?.capital) {
     return buildSeaLayout(
@@ -381,6 +389,8 @@ export function getPrefectureLabelLayout(
       [interiorAnchorX, interiorAnchorY],
     );
   }
+
+  if (interior) return interior;
 
   return null;
 }
