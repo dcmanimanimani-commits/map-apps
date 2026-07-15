@@ -24,24 +24,41 @@ const ADVENTURE_ZOOM = 1.5 * 2 * 0.8;
 export const ADVENTURE_WORLD_SCALE_W = 6.5 * ADVENTURE_ZOOM;
 export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
 
-/** 画面に約1地方が入るようワールドを拡大 */
+/** 画面に約1地方が入るようワールドを拡大（スマホは少し小さくして全体が収まりやすく） */
 export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
+  const phoneScale = viewportW > 0 && viewportW < 500 ? 0.72 : 1;
   return {
-    width: Math.round(viewportW * ADVENTURE_WORLD_SCALE_W),
-    height: Math.round(viewportH * ADVENTURE_WORLD_SCALE_H),
+    width: Math.round(viewportW * ADVENTURE_WORLD_SCALE_W * phoneScale),
+    height: Math.round(viewportH * ADVENTURE_WORLD_SCALE_H * phoneScale),
   };
 }
 
+/**
+ * カメラはプレイヤー（または対象点）が常に画面中央に来る位置。
+ * 地図端でもクランプしない（キャラ中央固定・マップが動く）。
+ */
 export function getCamera(
   player: MapPoint,
   viewportW: number,
   viewportH: number,
-  worldW: number,
-  worldH: number,
+  _worldW?: number,
+  _worldH?: number,
 ): MapPoint {
+  const vw = Math.max(1, viewportW);
+  const vh = Math.max(1, viewportH);
   return {
-    x: Math.max(0, Math.min(worldW - viewportW, player.x - viewportW / 2)),
-    y: Math.max(0, Math.min(worldH - viewportH, player.y - viewportH / 2)),
+    x: player.x - vw / 2,
+    y: player.y - vh / 2,
+  };
+}
+
+/** 表示中のビューポート実サイズ（CSS px） */
+export function readViewportSize(el: HTMLElement | null): { width: number; height: number } {
+  if (!el) return { width: 0, height: 0 };
+  const rect = el.getBoundingClientRect();
+  return {
+    width: Math.max(1, rect.width),
+    height: Math.max(1, rect.height),
   };
 }
 

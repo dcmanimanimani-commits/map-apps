@@ -16,6 +16,7 @@ import {
   mapDistance,
   moveToward,
   pickBossAndMinionSpawns,
+  readViewportSize,
   type MapPoint,
 } from '../utils/mapPositions';
 import {
@@ -46,11 +47,17 @@ const ONI_INTRO_MS = 1000;
 const GOAL_REVEAL_MS = 8000;
 const ARRIVE_RADIUS = 34;
 const CATCH_RADIUS = 34;
-const CHAR_SIZE = 152;
-const ONI_SIZE = 184;
-const MINION_SIZE = 96;
+const CHAR_SIZE_BASE = 152;
+const ONI_SIZE_BASE = 184;
+const MINION_SIZE_BASE = 96;
 /** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
 const PLAYER_FOLLOW_RATE = 0.036125;
+
+function adventureSpriteScale(viewW: number): number {
+  if (viewW > 0 && viewW < 430) return 0.52;
+  if (viewW < 700) return 0.7;
+  return 1;
+}
 
 const START_EXCLUDED_KANJI = new Set(['北海道', '沖縄県']);
 const START_REGIONS = new Set(['東北', '関東', '中部', '近畿', '中国', '四国', '九州']);
@@ -234,6 +241,11 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     return Math.round(Math.max(24, Math.min(42, viewW * 0.058)) * 0.8);
   }, [viewW]);
 
+  const spriteScale = useMemo(() => adventureSpriteScale(viewW), [viewW]);
+  const charSize = Math.round(CHAR_SIZE_BASE * spriteScale);
+  const oniSize = Math.round(ONI_SIZE_BASE * spriteScale);
+  const minionSize = Math.round(MINION_SIZE_BASE * spriteScale);
+
   const goalLandmarkSpots = useMemo(
     () => (goalPref ? getLandmarkSpots(goalPref.kanji) : []),
     [goalPref],
@@ -241,14 +253,21 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
   const displayCamera = useMemo(() => {
     if (playIntro === 'playing') {
-      return getCamera(playerPos, viewW, viewH, worldSize.width, worldSize.height);
+      // 実測サイズで中央固定（useMapSizeのズレを防ぐ）
+      const live = readViewportSize(viewportRef.current);
+      const vw = live.width > 1 ? live.width : viewW;
+      const vh = live.height > 1 ? live.height : viewH;
+      return getCamera(playerPos, vw, vh, worldSize.width, worldSize.height);
     }
     return cinematicCamera;
   }, [playIntro, playerPos, cinematicCamera, viewW, viewH, worldSize.width, worldSize.height]);
 
   const getActiveCamera = useCallback(() => {
     if (playIntroRef.current === 'playing') {
-      const { width: vw, height: vh } = viewSizeRef.current;
+      const live = readViewportSize(viewportRef.current);
+      const fallback = viewSizeRef.current;
+      const vw = live.width > 1 ? live.width : fallback.width;
+      const vh = live.height > 1 ? live.height : fallback.height;
       const { width: ww, height: wh } = worldSizeRef.current;
       return getCamera(playerPosRef.current, vw, vh, ww, wh);
     }
@@ -284,7 +303,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
   const initRound = useCallback(() => {
     const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(capitals);
-    const { width: vw, height: vh } = viewSizeRef.current;
+    const live = readViewportSize(viewportRef.current);
+    const fallback = viewSizeRef.current;
+    const vw = live.width > 1 ? live.width : fallback.width;
+    const vh = live.height > 1 ? live.height : fallback.height;
     const { width: ww, height: wh } = worldSizeRef.current;
     setStartPref(start);
     setGoalPref(goal);
@@ -413,7 +435,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     if (playIntro !== 'goal-reveal' || phase !== 'play') return;
     const goalRevealTimer = window.setTimeout(() => {
       prepareOniSpawns();
-      const { width: vw, height: vh } = viewSizeRef.current;
+      const live = readViewportSize(viewportRef.current);
+      const fallback = viewSizeRef.current;
+      const vw = live.width > 1 ? live.width : fallback.width;
+      const vh = live.height > 1 ? live.height : fallback.height;
       const { width: ww, height: wh } = worldSizeRef.current;
       cinematicTargetRef.current = getCamera(playerPosRef.current, vw, vh, ww, wh);
       setPlayIntro('oni-reveal');
@@ -719,24 +744,11 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       </div>
                       );
                     })}
-                    {playIntro !== 'goal-reveal' && (
-                    <MapCharacterSprite
-                      x={playerPos.x}
-                      y={playerPos.y}
-                      size={CHAR_SIZE}
-                      imageSrc={getAvatarFallbackSrc(chosenAvatar)}
-                      direction="down"
-                      step={playerStep}
-                      className="map-char--player"
-                      interactive={playIntro === 'playing'}
-                      onPointerDown={handlePlayerPointerDown}
-                    />
-                    )}
                     {oniActive && oniPos && !oniIntro && (
                       <MapCharacterSprite
                         x={oniPos.x}
                         y={oniPos.y}
-                        size={ONI_SIZE}
+                        size={oniSize}
                         imageSrc={getOniSpriteSrc(oniDir, oniStep)}
                         direction={oniDir}
                         step={oniStep}
@@ -751,7 +763,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                           key={i}
                           x={pos.x}
                           y={pos.y}
-                          size={MINION_SIZE}
+                          size={minionSize}
                           imageSrc={getMinionSpriteSrc(minionDir, minionStep)}
                           direction={minionDir}
                           step={minionStep}
@@ -761,6 +773,22 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                     })}
                   </div>
                 )}
+              />
+            </div>
+          )}
+          {/* キャラは常にマップ画面の中央。移動するとマップが動く */}
+          {playIntro !== 'goal-reveal' && worldSize.width >= 200 && (
+            <div className="adventure-player-pin" style={{ width: charSize, height: charSize }}>
+              <MapCharacterSprite
+                x={charSize / 2}
+                y={charSize / 2}
+                size={charSize}
+                imageSrc={getAvatarFallbackSrc(chosenAvatar)}
+                direction="down"
+                step={playerStep}
+                className="map-char--player"
+                interactive={playIntro === 'playing'}
+                onPointerDown={handlePlayerPointerDown}
               />
             </div>
           )}

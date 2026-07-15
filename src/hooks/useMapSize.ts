@@ -10,8 +10,8 @@ export function useMapSize(containerRef: RefObject<HTMLElement | null>) {
     const update = () => {
       const { width, height } = el.getBoundingClientRect();
       setSize({
-        width: Math.max(Math.floor(width), 280),
-        height: Math.max(Math.floor(height), 280),
+        width: Math.max(1, Math.round(width)),
+        height: Math.max(1, Math.round(height)),
       });
     };
 
