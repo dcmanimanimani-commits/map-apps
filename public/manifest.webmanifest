@@ -4,6 +4,7 @@
   "description": "小学生向け日本地図学習アプリ",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f0f4ff",
   "theme_color": "#6366f1",
   "icons": [

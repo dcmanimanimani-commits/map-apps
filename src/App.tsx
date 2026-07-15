@@ -10,10 +10,12 @@ import { RegionStudy } from './components/RegionStudy';
 import { PlayerStatus } from './components/PlayerStatus';
 import { PlayerSelect } from './components/PlayerSelect';
 import { PlayerProvider, usePlayer } from './context/PlayerContext';
+import { StickerBook } from './components/StickerBook';
 import './App.css';
 
 type Screen =
   | 'home'
+  | 'sticker-book'
   | 'regions'
   | 'region-study'
   | 'where'
@@ -68,6 +70,10 @@ function AppContent() {
     );
   }
 
+  if (screen === 'sticker-book') {
+    return <StickerBook onBack={() => setScreen('home')} />;
+  }
+
   if (screen === 'regions') {
     return (
       <RegionSelect
@@ -115,6 +121,15 @@ function AppContent() {
         <div>
           <span className="main-mode-title">地方べんきょう</span>
           <span className="main-mode-desc">まずここから！地方ごとに覚えよう</span>
+        </div>
+        <span className="main-mode-arrow">→</span>
+      </button>
+
+      <button className="main-mode-card sticker-book-card" onClick={() => setScreen('sticker-book')}>
+        <span className="main-mode-emoji">📒</span>
+        <div>
+          <span className="main-mode-title">シール帳</span>
+          <span className="main-mode-desc">地方べんきょうでシールをあつめよう</span>
         </div>
         <span className="main-mode-arrow">→</span>
       </button>

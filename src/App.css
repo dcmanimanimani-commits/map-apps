@@ -1,10 +1,19 @@
 .app {
+  width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 0.5rem 0.75rem;
-  min-height: 100dvh;
-  max-height: 100dvh;
+  padding:
+    max(0.5rem, var(--safe-top, env(safe-area-inset-top, 0px)))
+    max(0.75rem, var(--safe-right, env(safe-area-inset-right, 0px)))
+    max(0.5rem, var(--safe-bottom, env(safe-area-inset-bottom, 0px)))
+    max(0.75rem, var(--safe-left, env(safe-area-inset-left, 0px)));
+  min-height: var(--app-height, 100dvh);
+  max-height: var(--app-height, 100dvh);
+  height: var(--app-height, 100dvh);
+  overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 .compact-home {
@@ -136,14 +145,20 @@
 
 /* Game screens */
 .game-screen {
-  max-width: 900px;
+  width: 100%;
+  max-width: min(900px, 100%);
   margin: 0 auto;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: var(--app-height, 100dvh);
+  max-height: var(--app-height, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0.35rem 0.5rem;
+  padding:
+    max(0.35rem, var(--safe-top, env(safe-area-inset-top, 0px)))
+    max(0.5rem, var(--safe-right, env(safe-area-inset-right, 0px)))
+    max(0.35rem, var(--safe-bottom, env(safe-area-inset-bottom, 0px)))
+    max(0.5rem, var(--safe-left, env(safe-area-inset-left, 0px)));
+  box-sizing: border-box;
 }
 
 .game-header.compact {
@@ -356,7 +371,7 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
   display: flex;
   flex: 1;
-  min-height: 320px;
+  min-height: 0;
   margin-bottom: 1rem;
   touch-action: manipulation;
 }
@@ -365,7 +380,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 300px;
+  min-height: 0;
 }
 
 .japan-map {
@@ -471,7 +486,7 @@
 }
 
 .explore-map {
-  min-height: 360px;
+  min-height: 0;
 }
 
 .info-panel {
@@ -549,7 +564,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: calc(100dvh - 200px);
+  max-height: calc(var(--app-height, 100dvh) - 200px);
 }
 
 .landmark-guide {
@@ -669,13 +684,17 @@
   line-height: 1.75;
 }
 
-/* iPad 横向き・大画面：地図クイズのみサイドバー＋地図 */
-@media (orientation: landscape) and (min-width: 700px) {
+/* iPad 横向き・大画面：地図クイズのみサイドバー＋地図（スマホの横向きは除外） */
+@media (orientation: landscape) and (min-width: 700px) and (min-height: 500px) {
   .game-screen {
     max-width: none;
-    padding: 0 1rem 0.75rem;
-    height: 100vh;
-    height: 100dvh;
+    padding:
+      max(0.35rem, var(--safe-top, env(safe-area-inset-top, 0px)))
+      max(1rem, var(--safe-right, env(safe-area-inset-right, 0px)))
+      max(0.75rem, var(--safe-bottom, env(safe-area-inset-bottom, 0px)))
+      max(1rem, var(--safe-left, env(safe-area-inset-left, 0px)));
+    height: var(--app-height, 100dvh);
+    max-height: var(--app-height, 100dvh);
     overflow: hidden;
   }
 
@@ -718,11 +737,11 @@
 
   .explore-screen .game-sidebar {
     width: 320px;
-    max-height: calc(100dvh - 80px);
+    max-height: calc(var(--app-height, 100dvh) - 80px);
   }
 
   .explore-info {
-    max-height: calc(100dvh - 100px);
+    max-height: calc(var(--app-height, 100dvh) - 100px);
   }
 
   .btn-back {
@@ -747,7 +766,7 @@
 }
 
 /* iPad Pro 横向きなど特大画面 */
-@media (orientation: landscape) and (min-width: 1000px) {
+@media (orientation: landscape) and (min-width: 1000px) and (min-height: 500px) {
   .game-sidebar {
     width: 320px;
   }
@@ -757,8 +776,32 @@
   }
 }
 
+/* スマホ横向き：縦レイアウトのまま、端末サイズに合わせてスクロール可 */
+@media (orientation: landscape) and (max-height: 499px) {
+  .game-screen {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .game-play-area {
+    flex-direction: column;
+  }
+
+  .map-container,
+  .compact-map {
+    min-height: min(55svh, 280px);
+    flex: 1 1 auto;
+  }
+}
+
 /* 縦向き・スマホ */
 @media (max-width: 768px) {
+  .app,
+  .game-screen {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .btn-back {
     position: static;
     margin-bottom: 0.75rem;
@@ -2355,13 +2398,20 @@ html.boss-no-select .scribble-kanji-input {
 /* ===== Player & Avatar ===== */
 
 .player-select-screen {
-  min-height: 100dvh;
-  max-height: 100dvh;
+  min-height: var(--app-height, 100dvh);
+  max-height: var(--app-height, 100dvh);
+  height: var(--app-height, 100dvh);
   overflow-y: auto;
-  padding: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+  padding:
+    max(0.75rem, var(--safe-top, env(safe-area-inset-top, 0px)))
+    max(0.75rem, var(--safe-right, env(safe-area-inset-right, 0px)))
+    max(0.75rem, var(--safe-bottom, env(safe-area-inset-bottom, 0px)))
+    max(0.75rem, var(--safe-left, env(safe-area-inset-left, 0px)));
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  box-sizing: border-box;
 }
 
 .player-select-header {
@@ -3418,4 +3468,189 @@ html.boss-no-select .scribble-kanji-input {
   font-size: 0.75rem;
   color: #64748b;
   flex-shrink: 0;
+}
+
+/* シール帳 */
+.sticker-book-card {
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  color: #fffbeb;
+  border: 2px solid #c2410c;
+  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.35);
+}
+
+.sticker-book-card .main-mode-title,
+.sticker-book-card .main-mode-desc,
+.sticker-book-card .main-mode-arrow {
+  color: #fffbeb;
+}
+
+.sticker-book-card .main-mode-desc {
+  opacity: 0.95;
+}
+
+.sticker-book-screen {
+  gap: 0.35rem;
+  padding-bottom: 0.25rem;
+}
+
+.sticker-book-header {
+  margin-bottom: 0;
+}
+
+.sticker-book-lead {
+  margin: 0;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #9a3412;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.sticker-book-player.compact {
+  text-align: center;
+  background: white;
+  border-radius: 10px;
+  padding: 0.35rem 0.65rem;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.sticker-book-player.compact span {
+  margin: 0;
+}
+
+.sticker-book-count {
+  font-size: 0.9rem;
+  color: #6366f1;
+  font-weight: 700;
+}
+
+.sticker-book-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff7ed 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 14px;
+  padding: 0.55rem;
+  box-shadow: inset 0 0 0 3px #fff, 0 3px 12px rgba(0, 0, 0, 0.07);
+}
+
+.sticker-grid {
+  width: min(100%, 100cqh, 714px);
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.35rem;
+  aspect-ratio: 1;
+  max-height: 100%;
+  height: auto;
+}
+
+.sticker-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1.5px dashed #d1d5db;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.08rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sticker-cell.milestone {
+  border-color: #fcd34d;
+}
+
+.sticker-cell.earned {
+  border-style: solid;
+  border-color: #a78bfa;
+  background: white;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.12);
+}
+
+.sticker-cell.earned.cute {
+  border-color: #f472b6;
+}
+
+.sticker-cell.earned.cool {
+  border-color: #60a5fa;
+}
+
+.sticker-cell.locked {
+  opacity: 0.5;
+}
+
+.sticker-image {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  display: block;
+}
+
+.sticker-image.lg {
+  width: 96px;
+  height: 96px;
+}
+
+.sticker-placeholder {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  line-height: 1;
+}
+
+.reward-stamp-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #78350f;
+  font-size: 0.55rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.22rem 0.28rem;
+  border-radius: 5px;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(180, 83, 9, 0.35);
+  transform: rotate(-8deg);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.sticker-book-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.68rem;
+  color: #64748b;
+  line-height: 1.35;
+  padding: 0 0.25rem;
+  flex-shrink: 0;
+}
+
+.sticker-preview {
+  margin: 0.75rem 0 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sticker-preview-name {
+  margin: 0;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.reward-unlock-msg {
+  margin: 0.5rem 0 0;
+  font-weight: 700;
+  color: #d97706;
 }

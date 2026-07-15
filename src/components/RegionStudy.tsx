@@ -9,6 +9,7 @@ import { PlayerStatus } from './PlayerStatus';
 import { getTitleLevel } from '../data/progress';
 import type { AvatarLevel } from '../data/characterAssets';
 import { PlayerAvatar } from './PlayerAvatar';
+import { StickerPreview } from './StickerBook';
 
 interface RegionStudyProps {
   geo: JapanGeoJSON;
@@ -50,6 +51,9 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
   const [wrongKanji, setWrongKanji] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [newTitle, setNewTitle] = useState<string | null>(null);
+  const [newStickerId, setNewStickerId] = useState<string | null>(null);
+  const [newRewardMilestone, setNewRewardMilestone] = useState<number | null>(null);
+  const [isNewMaster, setIsNewMaster] = useState(false);
 
   const activeKanjiSet = useMemo(() => new Set(prefs.map((p) => p.kanji)), [prefs]);
   const selected = selectedKanji ? prefectureByKanji.get(selectedKanji) : null;
@@ -71,8 +75,11 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
   const advanceQuiz = useCallback((newScore: number, newAnswered: number) => {
     if (newAnswered >= quizGoal) {
       if (newScore === quizGoal) {
-        const updated = masterRegion(regionId);
-        setNewTitle(updated.title);
+        const result = masterRegion(regionId);
+        setNewTitle(result.progress.title);
+        setNewStickerId(result.newStickerId);
+        setNewRewardMilestone(result.newRewardMilestone);
+        setIsNewMaster(result.isNewMaster);
         setPhase('clear');
       } else {
         setFeedback({ message: `全問正解でクリア！ ${newScore}/${quizGoal}…もう一度`, type: 'error' });
@@ -136,9 +143,19 @@ export function RegionStudy({ geo, regionId, onBack, onMastered, onSwitchPlayer 
             className="clear-avatar"
           />
           <span className="clear-emoji">🏆</span>
-          <h2>{regionLabel}マスター！</h2>
-          <p>レベルアップ！称号がもらえたよ</p>
-          <p className="new-title">「{newTitle}」</p>
+          <h2>{isNewMaster ? `${regionLabel}マスター！` : `${regionLabel}クリア！`}</h2>
+          {isNewMaster ? (
+            <>
+              <p>レベルアップ！称号がもらえたよ</p>
+              <p className="new-title">「{newTitle}」</p>
+            </>
+          ) : (
+            <p>またクリア！{newStickerId ? 'シールゲット！' : 'おつかれさま！'}</p>
+          )}
+          {newStickerId && <StickerPreview stickerId={newStickerId} />}
+          {newRewardMilestone && (
+            <p className="reward-unlock-msg">🎁 {newRewardMilestone}まいたまった！「ごほうび」スタンプ！</p>
+          )}
           <div className="finish-actions">
             <button className="btn-primary" onClick={onMastered}>つぎの地方へ</button>
             <button className="btn-secondary" onClick={onBack}>地方選択へ</button>

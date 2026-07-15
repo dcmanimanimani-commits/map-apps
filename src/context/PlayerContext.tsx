@@ -13,7 +13,7 @@ import {
   setActivePlayer,
   type PlayerSlot,
 } from '../data/players';
-import type { PlayerProgress } from '../data/progress';
+import type { MasterRegionResult } from '../data/progress';
 import { masterRegion as masterRegionProgress, setSelectedAvatar } from '../data/progress';
 import type { AvatarLevel } from '../data/characterAssets';
 
@@ -23,7 +23,7 @@ interface PlayerContextValue {
   refresh: () => void;
   selectPlayer: (id: string) => void;
   addPlayer: (name: string) => PlayerSlot;
-  masterRegion: (regionId: string) => PlayerProgress;
+  masterRegion: (regionId: string) => MasterRegionResult;
   setAvatar: (level: AvatarLevel) => void;
 }
 
