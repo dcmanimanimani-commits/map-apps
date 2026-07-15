@@ -54,7 +54,8 @@ const MINION_SIZE_BASE = 96;
 const PLAYER_FOLLOW_RATE = 0.036125;
 
 function adventureSpriteScale(viewW: number): number {
-  if (viewW > 0 && viewW < 430) return 0.52;
+  if (viewW > 0 && viewW < 430) return 0.38; // iPhone：マップ縮小に合わせてキャラも小さく
+  if (viewW < 500) return 0.48;
   if (viewW < 700) return 0.7;
   return 1;
 }
@@ -237,8 +238,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   capitalsRef.current = capitals;
 
   const capitalMarkerSize = useMemo(() => {
-    if (viewW < 200) return Math.round(26 * 0.8);
-    return Math.round(Math.max(24, Math.min(42, viewW * 0.058)) * 0.8);
+    if (viewW < 200) return Math.round(22 * 0.75);
+    const base = Math.max(20, Math.min(42, viewW * 0.058));
+    const phoneShrink = viewW < 430 ? 0.62 : viewW < 500 ? 0.72 : 0.8;
+    return Math.round(base * phoneShrink);
   }, [viewW]);
 
   const spriteScale = useMemo(() => adventureSpriteScale(viewW), [viewW]);

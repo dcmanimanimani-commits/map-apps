@@ -24,9 +24,14 @@ const ADVENTURE_ZOOM = 1.5 * 2 * 0.8;
 export const ADVENTURE_WORLD_SCALE_W = 6.5 * ADVENTURE_ZOOM;
 export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
 
-/** 画面に約1地方が入るようワールドを拡大（スマホは少し小さくして全体が収まりやすく） */
+/**
+ * 画面に約1地方が入るようワールドを拡大。
+ * スマホはワールドを小さくしてズームアウト＝映る範囲を広げ、鬼の接近を早めに見えるようにする。
+ */
 export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
-  const phoneScale = viewportW > 0 && viewportW < 500 ? 0.72 : 1;
+  let phoneScale = 1;
+  if (viewportW > 0 && viewportW < 430) phoneScale = 0.48; // iPhone：広く見せる
+  else if (viewportW < 500) phoneScale = 0.58;
   return {
     width: Math.round(viewportW * ADVENTURE_WORLD_SCALE_W * phoneScale),
     height: Math.round(viewportH * ADVENTURE_WORLD_SCALE_H * phoneScale),
