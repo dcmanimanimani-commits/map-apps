@@ -81,8 +81,8 @@ export function JapanMap({
   const mapInstanceId = useId().replace(/:/g, '');
   const containerRef = useRef<HTMLDivElement>(null);
   const measured = useMapSize(containerRef);
-  const width = fixedSize?.width ?? measured.width;
-  const height = fixedSize?.height ?? measured.height;
+  const width = fixedSize?.width ?? (measured.width > 0 ? measured.width : 700);
+  const height = fixedSize?.height ?? (measured.height > 0 ? measured.height : 520);
 
   const isFocused = Boolean(focusKanjiSet && focusKanjiSet.size > 0);
   const { mainland, okinawa } = useMemo(() => splitMainlandAndOkinawa(geo), [geo]);

@@ -29,9 +29,11 @@ export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
  * スマホはワールドを小さくしてズームアウト＝映る範囲を広げ、鬼の接近を早めに見えるようにする。
  */
 export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
+  const shortSide = Math.min(viewportW, viewportH);
+  // 小さいほどズームアウト（映る範囲が広い）
   let phoneScale = 1;
-  if (viewportW > 0 && viewportW < 430) phoneScale = 0.48; // iPhone：広く見せる
-  else if (viewportW < 500) phoneScale = 0.58;
+  if (shortSide > 0 && shortSide < 500) phoneScale = 0.36; // iPhone / 縦持ちスマホ
+  else if (shortSide < 700) phoneScale = 0.7; // 小さめタブレット
   return {
     width: Math.round(viewportW * ADVENTURE_WORLD_SCALE_W * phoneScale),
     height: Math.round(viewportH * ADVENTURE_WORLD_SCALE_H * phoneScale),

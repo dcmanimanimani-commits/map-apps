@@ -53,10 +53,10 @@ const MINION_SIZE_BASE = 96;
 /** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
 const PLAYER_FOLLOW_RATE = 0.036125;
 
-function adventureSpriteScale(viewW: number): number {
-  if (viewW > 0 && viewW < 430) return 0.38; // iPhone：マップ縮小に合わせてキャラも小さく
-  if (viewW < 500) return 0.48;
-  if (viewW < 700) return 0.7;
+function adventureSpriteScale(viewW: number, viewH: number): number {
+  const shortSide = Math.min(viewW, viewH);
+  if (shortSide > 0 && shortSide < 500) return 0.32; // iPhone：はっきり小さく
+  if (shortSide < 700) return 0.6;
   return 1;
 }
 
@@ -180,10 +180,13 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [chosenAvatar, setChosenAvatar] = useState<AvatarLevel>(defaultAvatar);
   const [pendingStart, setPendingStart] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const { width: viewW, height: viewH } = useMapSize(viewportRef);
+  // play 中だけ測る（intro 時は viewport 未マウントで 700 固定になるのを防ぐ）
+  const measuring = phase === 'play' || pendingStart;
+  const { width: viewW, height: viewH } = useMapSize(viewportRef, measuring);
+  const viewportReady = viewW >= 120 && viewH >= 120;
   const worldSize = useMemo(
-    () => (viewW >= 200 ? buildWorldSize(viewW, viewH) : { width: 0, height: 0 }),
-    [viewW, viewH],
+    () => (viewportReady ? buildWorldSize(viewW, viewH) : { width: 0, height: 0 }),
+    [viewportReady, viewW, viewH],
   );
 
   const [startPref, setStartPref] = useState<Prefecture | null>(null);
@@ -238,13 +241,17 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   capitalsRef.current = capitals;
 
   const capitalMarkerSize = useMemo(() => {
-    if (viewW < 200) return Math.round(22 * 0.75);
-    const base = Math.max(20, Math.min(42, viewW * 0.058));
-    const phoneShrink = viewW < 430 ? 0.62 : viewW < 500 ? 0.72 : 0.8;
+    if (!viewportReady) return 16;
+    const shortSide = Math.min(viewW, viewH);
+    const base = Math.max(18, Math.min(36, shortSide * 0.05));
+    const phoneShrink = shortSide < 500 ? 0.55 : shortSide < 700 ? 0.75 : 0.85;
     return Math.round(base * phoneShrink);
-  }, [viewW]);
+  }, [viewportReady, viewW, viewH]);
 
-  const spriteScale = useMemo(() => adventureSpriteScale(viewW), [viewW]);
+  const spriteScale = useMemo(
+    () => (viewportReady ? adventureSpriteScale(viewW, viewH) : 0.32),
+    [viewportReady, viewW, viewH],
+  );
   const charSize = Math.round(CHAR_SIZE_BASE * spriteScale);
   const oniSize = Math.round(ONI_SIZE_BASE * spriteScale);
   const minionSize = Math.round(MINION_SIZE_BASE * spriteScale);
