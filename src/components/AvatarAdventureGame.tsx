@@ -45,8 +45,8 @@ const MINION_COUNT = 10;
 const MINION_SPEEDS = [2.88, 3.12, 3.36, 3.6, 3.84, 4.08, 4.32, 4.56, 4.8, 5.04] as const;
 const ONI_INTRO_MS = 1000;
 const GOAL_REVEAL_MS = 8000;
-const ARRIVE_RADIUS = 34;
-const CATCH_RADIUS = 34;
+const ARRIVE_RADIUS_BASE = 48;
+const CATCH_RADIUS_BASE = 40;
 const CHAR_SIZE_BASE = 152;
 const ONI_SIZE_BASE = 184;
 const MINION_SIZE_BASE = 96;
@@ -58,6 +58,15 @@ function adventureSpriteScale(viewW: number, viewH: number): number {
   if (shortSide > 0 && shortSide < 500) return 0.32; // iPhone：はっきり小さく
   if (shortSide < 700) return 0.6;
   return 1;
+}
+
+/** 画面サイズに合わせたゴール／接触判定半径 */
+function interactionRadius(viewW: number, viewH: number, base: number): number {
+  const shortSide = Math.min(viewW, viewH);
+  if (shortSide <= 0) return base;
+  // スマホほど少し広め（ピクセル座標が詰まっても触りやすい）
+  const scale = shortSide < 500 ? 1.35 : shortSide < 700 ? 1.15 : 1;
+  return Math.max(base, shortSide * 0.07 * scale);
 }
 
 const START_EXCLUDED_KANJI = new Set(['北海道', '沖縄県']);
@@ -180,14 +189,22 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [chosenAvatar, setChosenAvatar] = useState<AvatarLevel>(defaultAvatar);
   const [pendingStart, setPendingStart] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
-  // play 中だけ測る（intro 時は viewport 未マウントで 700 固定になるのを防ぐ）
+  // play 中だけ測る（intro 時は viewport 未マウントで誤サイズになるのを防ぐ）
   const measuring = phase === 'play' || pendingStart;
-  const { width: viewW, height: viewH } = useMapSize(viewportRef, measuring);
-  const viewportReady = viewW >= 120 && viewH >= 120;
-  const worldSize = useMemo(
-    () => (viewportReady ? buildWorldSize(viewW, viewH) : { width: 0, height: 0 }),
-    [viewportReady, viewW, viewH],
-  );
+  const { width: liveViewW, height: liveViewH } = useMapSize(viewportRef, measuring);
+  const viewportReady = liveViewW >= 120 && liveViewH >= 120;
+
+  /** ラウンド中はワールド座標を固定（途中で組み直すとゴール判定・鬼出現が壊れる） */
+  const [lockedWorldSize, setLockedWorldSize] = useState({ width: 0, height: 0 });
+  const [lockedViewSize, setLockedViewSize] = useState({ width: 0, height: 0 });
+  const roundLocked = lockedWorldSize.width >= 200;
+  const worldSize = roundLocked
+    ? lockedWorldSize
+    : viewportReady
+      ? buildWorldSize(liveViewW, liveViewH)
+      : { width: 0, height: 0 };
+  const viewW = roundLocked ? lockedViewSize.width : liveViewW;
+  const viewH = roundLocked ? lockedViewSize.height : liveViewH;
 
   const [startPref, setStartPref] = useState<Prefecture | null>(null);
   const [goalPref, setGoalPref] = useState<Prefecture | null>(null);
@@ -221,6 +238,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const lastDirRef = useRef<CharDirection>('down');
   const worldSizeRef = useRef(worldSize);
   const viewSizeRef = useRef({ width: viewW, height: viewH });
+  const arriveRadiusRef = useRef(ARRIVE_RADIUS_BASE);
+  const catchRadiusRef = useRef(CATCH_RADIUS_BASE);
   const geoRef = useRef(geo);
 
   playerPosRef.current = playerPos;
@@ -291,7 +310,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const prepareOniSpawns = useCallback(() => {
     const { width: ww, height: wh } = worldSizeRef.current;
     const { width: vw, height: vh } = viewSizeRef.current;
-    if (ww < 200 || capitalsRef.current.size === 0) return;
+    const caps = capitalsRef.current;
+    if (ww < 200 || vh < 100 || vw < 100 || caps.size === 0) return false;
 
     const { boss: bossSpawn, minions: minionSpawns } = pickBossAndMinionSpawns(
       MINION_COUNT,
@@ -301,7 +321,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       wh,
       vw,
       vh,
-      capitalsRef.current,
+      caps,
     );
     setOniPos(bossSpawn);
     oniPosRef.current = bossSpawn;
@@ -309,15 +329,35 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     minionPosRef.current = minionSpawns;
     setOniActive(true);
     oniActiveRef.current = true;
+    return true;
   }, []);
 
   const initRound = useCallback(() => {
-    const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(capitals);
     const live = readViewportSize(viewportRef.current);
-    const fallback = viewSizeRef.current;
-    const vw = live.width > 1 ? live.width : fallback.width;
-    const vh = live.height > 1 ? live.height : fallback.height;
-    const { width: ww, height: wh } = worldSizeRef.current;
+    const vw = live.width > 1 ? live.width : liveViewW;
+    const vh = live.height > 1 ? live.height : liveViewH;
+    if (vw < 120 || vh < 120) return false;
+
+    // このラウンドの座標系を固定
+    const locked = buildWorldSize(vw, vh);
+    if (locked.width < 200 || locked.height < 200) return false;
+
+    setLockedWorldSize(locked);
+    setLockedViewSize({ width: vw, height: vh });
+    worldSizeRef.current = locked;
+    viewSizeRef.current = { width: vw, height: vh };
+    arriveRadiusRef.current = interactionRadius(vw, vh, ARRIVE_RADIUS_BASE);
+    catchRadiusRef.current = interactionRadius(vw, vh, CATCH_RADIUS_BASE);
+
+    const roundCapitals = buildPrefectureCapitalPositions(
+      geoRef.current,
+      locked.width,
+      locked.height,
+    );
+    if (roundCapitals.size === 0) return false;
+    capitalsRef.current = roundCapitals;
+
+    const { start, goal, startPos, goalPos: goalSpot } = pickStartAndGoal(roundCapitals);
     setStartPref(start);
     setGoalPref(goal);
     goalPosRef.current = goalSpot;
@@ -341,14 +381,15 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       grabOffsetY: 0,
     };
 
-    const startCam = getCamera(startPos, vw, vh, ww, wh);
-    const goalCam = getCamera(goalSpot, vw, vh, ww, wh);
+    const startCam = getCamera(startPos, vw, vh, locked.width, locked.height);
+    const goalCam = getCamera(goalSpot, vw, vh, locked.width, locked.height);
     cinematicCameraRef.current = startCam;
     cinematicTargetRef.current = goalCam;
     setCinematicCamera(startCam);
     setPlayIntro('goal-reveal');
     playIntroRef.current = 'goal-reveal';
-  }, [capitals]);
+    return true;
+  }, [liveViewW, liveViewH]);
 
   const applyPointerToPlayer = useCallback(() => {
     const ptr = pointerRef.current;
@@ -394,15 +435,16 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, [getActiveCamera]);
 
   const requestStart = useCallback(() => {
+    setLockedWorldSize({ width: 0, height: 0 });
+    setLockedViewSize({ width: 0, height: 0 });
     setPhase('play');
     setPendingStart(true);
   }, []);
 
   useEffect(() => {
-    if (!pendingStart || phase !== 'play' || worldSize.width < 200 || capitals.size === 0) return;
-    initRound();
-    setPendingStart(false);
-  }, [pendingStart, phase, worldSize.width, capitals.size, initRound]);
+    if (!pendingStart || phase !== 'play' || !viewportReady) return;
+    if (initRound()) setPendingStart(false);
+  }, [pendingStart, phase, viewportReady, initRound]);
 
   const applyPointerRef = useRef(applyPointerToPlayer);
   applyPointerRef.current = applyPointerToPlayer;
@@ -442,13 +484,14 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, []);
 
   useEffect(() => {
-    if (playIntro !== 'goal-reveal' || phase !== 'play') return;
+    if (playIntro !== 'goal-reveal' || phase !== 'play' || !roundLocked) return;
     const goalRevealTimer = window.setTimeout(() => {
-      prepareOniSpawns();
-      const live = readViewportSize(viewportRef.current);
-      const fallback = viewSizeRef.current;
-      const vw = live.width > 1 ? live.width : fallback.width;
-      const vh = live.height > 1 ? live.height : fallback.height;
+      const spawned = prepareOniSpawns();
+      if (!spawned) {
+        // 失敗時は少し待って再試行
+        prepareOniSpawns();
+      }
+      const { width: vw, height: vh } = viewSizeRef.current;
       const { width: ww, height: wh } = worldSizeRef.current;
       cinematicTargetRef.current = getCamera(playerPosRef.current, vw, vh, ww, wh);
       setPlayIntro('oni-reveal');
@@ -457,7 +500,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
       oniChasePausedRef.current = true;
     }, GOAL_REVEAL_MS);
     return () => clearTimeout(goalRevealTimer);
-  }, [playIntro, phase, prepareOniSpawns]);
+  }, [playIntro, phase, roundLocked, prepareOniSpawns]);
 
   useEffect(() => {
     if (playIntro !== 'oni-reveal' || phase !== 'play') return;
@@ -513,7 +556,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           oniPosRef.current = nextOni;
           setOniPos(nextOni);
 
-          if (mapDistance(nextOni, nextPlayer) < CATCH_RADIUS) {
+          if (mapDistance(nextOni, nextPlayer) < catchRadiusRef.current) {
             setPhase('lose');
             phaseRef.current = 'lose';
             return;
@@ -527,7 +570,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         setMinionPositions(nextMinions);
 
         for (const minionPos of nextMinions) {
-          if (mapDistance(minionPos, nextPlayer) < CATCH_RADIUS) {
+          if (mapDistance(minionPos, nextPlayer) < catchRadiusRef.current) {
             setPhase('lose');
             phaseRef.current = 'lose';
             return;
@@ -535,7 +578,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         }
       }
 
-      if (mapDistance(nextPlayer, goalPosRef.current) < ARRIVE_RADIUS) {
+      if (mapDistance(nextPlayer, goalPosRef.current) < arriveRadiusRef.current) {
         setPhase('win');
         phaseRef.current = 'win';
         return;
@@ -551,7 +594,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [phase, worldSize.width]);
+  }, [phase, roundLocked]);
 
   const playerStep = stepFromMotion(isMoving, animFrame);
   const oniStep = oniActive ? stepFromMotion(true, animFrame) : 'idle';
