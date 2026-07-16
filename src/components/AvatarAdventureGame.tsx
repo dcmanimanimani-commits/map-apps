@@ -4,6 +4,7 @@ import { useMapSize } from '../hooks/useMapSize';
 import { prefectures, type Prefecture } from '../data/prefectures';
 import { getLandmarkSpots } from '../data/landmarkDetails';
 import { usePlayer } from '../context/PlayerContext';
+import { ADVENTURE_SKILLS } from '../data/adventureSkills';
 import { BOSS_IMAGE, type AvatarLevel } from '../data/characterAssets';
 import { resolveAvatarLevel } from '../data/progress';
 import { AdventureAvatarSelect } from './AdventureAvatarSelect';
@@ -40,6 +41,14 @@ interface AvatarAdventureGameProps {
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 type PlayIntro = 'goal-reveal' | 'oni-reveal' | 'playing';
 
+interface TrapPoint extends MapPoint {
+  expiresAt: number;
+}
+
+interface TimedEffectPoint extends MapPoint {
+  expiresAt: number;
+}
+
 /** デスクトップ基準。iPhoneはマップ縮尺分をさらに掛けて体感速度を揃える */
 const ONI_SPEED_BASE = 2.646; // 5.4 × 0.7 × 0.7
 const MINION_COUNT = 10;
@@ -53,6 +62,19 @@ const ONI_SIZE_BASE = 184;
 const MINION_SIZE_BASE = 96;
 /** 指の目標位置へ向かう速さ（小さいほどゆっくり） */
 const PLAYER_FOLLOW_RATE = 0.036125;
+const INVINCIBLE_MS = 2000;
+const DASH_MS = 1000;
+const STICKY_TRAIL_MS = 5000;
+const STUN_MS = 3000;
+const KIND_SLOW_MS = 5000;
+const TRAIL_DROP_INTERVAL_MS = 180;
+const TRAP_RADIUS = 38;
+const STICKY_RADIUS = 52;
+const AURA_RADIUS = 170;
+const SPIN_RADIUS = 150;
+const FRONT_RANGE = 220;
+const FRONT_ANGLE_COS = 0.2;
+const KNOCKBACK_DIST = 150;
 
 function adventureSpriteScale(viewW: number, viewH: number): number {
   const shortSide = Math.min(viewW, viewH);
@@ -68,6 +90,31 @@ function interactionRadius(viewW: number, viewH: number, base: number): number {
   // スマホほど少し広め（ピクセル座標が詰まっても触りやすい）
   const scale = shortSide < 500 ? 1.35 : shortSide < 700 ? 1.15 : 1;
   return Math.max(base, shortSide * 0.07 * scale);
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+function normalizeVector(dx: number, dy: number) {
+  const dist = Math.hypot(dx, dy) || 1;
+  return { x: dx / dist, y: dy / dist, dist };
+}
+
+function directionVector(dir: CharDirection): MapPoint {
+  if (dir === 'up') return { x: 0, y: -1 };
+  if (dir === 'down') return { x: 0, y: 1 };
+  if (dir === 'left') return { x: -1, y: 0 };
+  return { x: 1, y: 0 };
+}
+
+function inFrontCone(from: MapPoint, target: MapPoint, dir: CharDirection, range = FRONT_RANGE): boolean {
+  const dx = target.x - from.x;
+  const dy = target.y - from.y;
+  const { x: nx, y: ny, dist } = normalizeVector(dx, dy);
+  if (dist > range) return false;
+  const fv = directionVector(dir);
+  return fv.x * nx + fv.y * ny >= FRONT_ANGLE_COS;
 }
 
 const START_EXCLUDED_KANJI = new Set(['北海道', '沖縄県']);
@@ -212,12 +259,21 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const [playerPos, setPlayerPos] = useState<MapPoint>({ x: 350, y: 260 });
   const [oniPos, setOniPos] = useState<MapPoint | null>(null);
   const [minionPositions, setMinionPositions] = useState<MapPoint[]>([]);
+  const [poopTraps, setPoopTraps] = useState<TrapPoint[]>([]);
+  const [stickyTrail, setStickyTrail] = useState<TimedEffectPoint[]>([]);
+  const [waterSprayUntil, setWaterSprayUntil] = useState(0);
+  const [fireSprayUntil, setFireSprayUntil] = useState(0);
   const [oniActive, setOniActive] = useState(false);
   const [oniIntro, setOniIntro] = useState(false);
   const [playIntro, setPlayIntro] = useState<PlayIntro>('playing');
   const [cinematicCamera, setCinematicCamera] = useState<MapPoint>({ x: 0, y: 0 });
   const [animFrame, setAnimFrame] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
+  const [invincibleUntil, setInvincibleUntil] = useState(0);
+  const [dashUntil, setDashUntil] = useState(0);
+  const [stickyTrailUntil, setStickyTrailUntil] = useState(0);
+  const [slowAuraUntil, setSlowAuraUntil] = useState(0);
+  const [skillCooldownUntil, setSkillCooldownUntil] = useState(0);
 
   const pointerRef = useRef({
     active: false,
@@ -229,6 +285,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const playerPosRef = useRef(playerPos);
   const oniPosRef = useRef<MapPoint | null>(null);
   const minionPosRef = useRef<MapPoint[]>([]);
+  const poopTrapsRef = useRef<TrapPoint[]>([]);
+  const stickyTrailRef = useRef<TimedEffectPoint[]>([]);
   const oniActiveRef = useRef(false);
   const oniChasePausedRef = useRef(false);
   const playIntroRef = useRef<PlayIntro>('playing');
@@ -243,16 +301,31 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const catchRadiusRef = useRef(CATCH_RADIUS_BASE);
   const oniSpeedRef = useRef(ONI_SPEED_BASE);
   const minionSpeedsRef = useRef<readonly number[]>(MINION_SPEEDS_BASE);
+  const invincibleUntilRef = useRef(0);
+  const dashUntilRef = useRef(0);
+  const stickyTrailUntilRef = useRef(0);
+  const slowAuraUntilRef = useRef(0);
+  const skillCooldownUntilRef = useRef(0);
+  const oniFrozenUntilRef = useRef(0);
+  const minionFrozenUntilRef = useRef<number[]>([]);
+  const lastTrailDropAtRef = useRef(0);
   const geoRef = useRef(geo);
 
   playerPosRef.current = playerPos;
   oniPosRef.current = oniPos;
   minionPosRef.current = minionPositions;
+  poopTrapsRef.current = poopTraps;
+  stickyTrailRef.current = stickyTrail;
   oniActiveRef.current = oniActive;
   playIntroRef.current = playIntro;
   phaseRef.current = phase;
   worldSizeRef.current = worldSize;
   viewSizeRef.current = { width: viewW, height: viewH };
+  invincibleUntilRef.current = invincibleUntil;
+  dashUntilRef.current = dashUntil;
+  stickyTrailUntilRef.current = stickyTrailUntil;
+  slowAuraUntilRef.current = slowAuraUntil;
+  skillCooldownUntilRef.current = skillCooldownUntil;
 
   const capitals = useMemo(() => {
     if (worldSize.width < 200) return new Map<string, MapPoint>();
@@ -277,6 +350,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const charSize = Math.round(CHAR_SIZE_BASE * spriteScale);
   const oniSize = Math.round(ONI_SIZE_BASE * spriteScale);
   const minionSize = Math.round(MINION_SIZE_BASE * spriteScale);
+  const skill = ADVENTURE_SKILLS[chosenAvatar];
+  const skillReady = phase === 'play' && playIntro === 'playing' && nowMs() >= skillCooldownUntil;
 
   const goalLandmarkSpots = useMemo(
     () => (goalPref ? getLandmarkSpots(goalPref.kanji) : []),
@@ -375,12 +450,31 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     oniPosRef.current = null;
     setMinionPositions([]);
     minionPosRef.current = [];
+    setPoopTraps([]);
+    poopTrapsRef.current = [];
+    setStickyTrail([]);
+    stickyTrailRef.current = [];
+    setWaterSprayUntil(0);
+    setFireSprayUntil(0);
     setOniActive(false);
     oniActiveRef.current = false;
     setOniIntro(false);
     oniChasePausedRef.current = true;
     setAnimFrame(0);
     setIsMoving(false);
+    setInvincibleUntil(0);
+    setDashUntil(0);
+    setStickyTrailUntil(0);
+    setSlowAuraUntil(0);
+    setSkillCooldownUntil(0);
+    invincibleUntilRef.current = 0;
+    dashUntilRef.current = 0;
+    stickyTrailUntilRef.current = 0;
+    slowAuraUntilRef.current = 0;
+    skillCooldownUntilRef.current = 0;
+    oniFrozenUntilRef.current = 0;
+    minionFrozenUntilRef.current = [];
+    lastTrailDropAtRef.current = 0;
     pointerRef.current = {
       active: false,
       clientX: 0,
@@ -413,10 +507,11 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     const before = playerPosRef.current;
     const targetX = touch.x - ptr.grabOffsetX;
     const targetY = touch.y - ptr.grabOffsetY;
+    const followRate = dashUntilRef.current > nowMs() ? PLAYER_FOLLOW_RATE * 3.1 : PLAYER_FOLLOW_RATE;
     const nextPlayer = clampToMap(
       {
-        x: before.x + (targetX - before.x) * PLAYER_FOLLOW_RATE,
-        y: before.y + (targetY - before.y) * PLAYER_FOLLOW_RATE,
+        x: before.x + (targetX - before.x) * followRate,
+        y: before.y + (targetY - before.y) * followRate,
       },
       ww,
       wh,
@@ -448,6 +543,141 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     setPhase('play');
     setPendingStart(true);
   }, []);
+
+  const knockbackFromPlayer = useCallback((target: MapPoint, distance = KNOCKBACK_DIST) => {
+    const from = playerPosRef.current;
+    const vec = normalizeVector(target.x - from.x, target.y - from.y);
+    const { width: ww, height: wh } = worldSizeRef.current;
+    return clampToMap(
+      { x: target.x + vec.x * distance, y: target.y + vec.y * distance },
+      ww,
+      wh,
+    );
+  }, []);
+
+  const removeClosestFrontOni = useCallback(() => {
+    const dir = lastDirRef.current;
+    const player = playerPosRef.current;
+    let removeBoss = false;
+    let removeMinionIdx = -1;
+    let bestDist = Infinity;
+
+    if (oniPosRef.current && inFrontCone(player, oniPosRef.current, dir)) {
+      bestDist = mapDistance(player, oniPosRef.current);
+      removeBoss = true;
+    }
+    minionPosRef.current.forEach((pos, index) => {
+      if (!inFrontCone(player, pos, dir)) return;
+      const dist = mapDistance(player, pos);
+      if (dist < bestDist) {
+        bestDist = dist;
+        removeBoss = false;
+        removeMinionIdx = index;
+      }
+    });
+
+    if (removeBoss) {
+      oniPosRef.current = null;
+      setOniPos(null);
+      return true;
+    }
+    if (removeMinionIdx >= 0) {
+      const next = minionPosRef.current.filter((_, index) => index !== removeMinionIdx);
+      minionPosRef.current = next;
+      minionFrozenUntilRef.current = minionFrozenUntilRef.current.filter((_, index) => index !== removeMinionIdx);
+      setMinionPositions(next);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const affectFrontConeOnis = useCallback((mode: 'remove' | 'knockback') => {
+    const dir = lastDirRef.current;
+    const player = playerPosRef.current;
+
+    if (oniPosRef.current && inFrontCone(player, oniPosRef.current, dir)) {
+      if (mode === 'remove') {
+        oniPosRef.current = null;
+        setOniPos(null);
+      } else {
+        const next = knockbackFromPlayer(oniPosRef.current, KNOCKBACK_DIST);
+        oniPosRef.current = next;
+        setOniPos(next);
+      }
+    }
+
+    const nextMinions = minionPosRef.current.flatMap((pos) => {
+      if (!inFrontCone(player, pos, dir)) return [pos];
+      if (mode === 'remove') return [];
+      return [knockbackFromPlayer(pos, KNOCKBACK_DIST)];
+    });
+    minionPosRef.current = nextMinions;
+    if (mode === 'remove') {
+      minionFrozenUntilRef.current = minionFrozenUntilRef.current.slice(0, nextMinions.length);
+    }
+    setMinionPositions(nextMinions);
+  }, [knockbackFromPlayer]);
+
+  const activateSkill = useCallback(() => {
+    if (phaseRef.current !== 'play' || playIntroRef.current !== 'playing') return;
+    const now = nowMs();
+    if (now < skillCooldownUntilRef.current) return;
+
+    skillCooldownUntilRef.current = now + skill.cooldownMs;
+    setSkillCooldownUntil(skillCooldownUntilRef.current);
+
+    switch (skill.id) {
+      case 'poop-slip':
+        setPoopTraps((prev) => {
+          const next = [...prev, { ...playerPosRef.current, expiresAt: now + 10000 }];
+          poopTrapsRef.current = next;
+          return next;
+        });
+        break;
+      case 'roll-invincible':
+        setInvincibleUntil(now + INVINCIBLE_MS);
+        break;
+      case 'jet-dash':
+        setDashUntil(now + DASH_MS);
+        break;
+      case 'sticky-trail':
+        setStickyTrailUntil(now + STICKY_TRAIL_MS);
+        setStickyTrail((prev) => {
+          const next = [...prev, { ...playerPosRef.current, expiresAt: now + STICKY_TRAIL_MS }];
+          stickyTrailRef.current = next;
+          return next;
+        });
+        lastTrailDropAtRef.current = 0;
+        break;
+      case 'crutch-spin': {
+        if (oniPosRef.current && mapDistance(playerPosRef.current, oniPosRef.current) <= SPIN_RADIUS) {
+          const next = knockbackFromPlayer(oniPosRef.current, KNOCKBACK_DIST * 1.2);
+          oniPosRef.current = next;
+          setOniPos(next);
+        }
+        const nextMinions = minionPosRef.current.map((pos) =>
+          mapDistance(playerPosRef.current, pos) <= SPIN_RADIUS ? knockbackFromPlayer(pos, KNOCKBACK_DIST * 1.2) : pos,
+        );
+        minionPosRef.current = nextMinions;
+        setMinionPositions(nextMinions);
+        break;
+      }
+      case 'kind-slow':
+        setSlowAuraUntil(now + KIND_SLOW_MS);
+        break;
+      case 'chomp-remove':
+        removeClosestFrontOni();
+        break;
+      case 'water-fan':
+        setWaterSprayUntil(now + 450);
+        affectFrontConeOnis('knockback');
+        break;
+      case 'fire-fan':
+        setFireSprayUntil(now + 450);
+        affectFrontConeOnis('remove');
+        break;
+    }
+  }, [affectFrontConeOnis, knockbackFromPlayer, removeClosestFrontOni, skill]);
 
   useEffect(() => {
     if (!pendingStart || phase !== 'play' || !viewportReady) return;
@@ -551,34 +781,76 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
     const tick = () => {
       if (phaseRef.current !== 'play') return;
+      const now = nowMs();
+
+      const activePoop = poopTrapsRef.current.filter((trap) => trap.expiresAt > now);
+      if (activePoop.length !== poopTrapsRef.current.length) {
+        poopTrapsRef.current = activePoop;
+        setPoopTraps(activePoop);
+      }
+      const activeSticky = stickyTrailRef.current.filter((trail) => trail.expiresAt > now);
+      if (activeSticky.length !== stickyTrailRef.current.length) {
+        stickyTrailRef.current = activeSticky;
+        setStickyTrail(activeSticky);
+      }
 
       if (pointerRef.current.active) {
         applyPointerRef.current();
       }
 
       const nextPlayer = playerPosRef.current;
+      if (stickyTrailUntilRef.current > now && now - lastTrailDropAtRef.current > TRAIL_DROP_INTERVAL_MS) {
+        lastTrailDropAtRef.current = now;
+        const nextTrail = [...stickyTrailRef.current, { ...nextPlayer, expiresAt: now + STICKY_TRAIL_MS }];
+        stickyTrailRef.current = nextTrail;
+        setStickyTrail(nextTrail);
+      }
 
       if (oniActiveRef.current && !oniChasePausedRef.current) {
-        if (oniPosRef.current) {
-          const nextOni = moveToward(oniPosRef.current, nextPlayer, oniSpeedRef.current);
+        if (oniPosRef.current && oniFrozenUntilRef.current <= now) {
+          let oniSpeed = oniSpeedRef.current;
+          if (slowAuraUntilRef.current > now && mapDistance(oniPosRef.current, nextPlayer) <= AURA_RADIUS) {
+            oniSpeed *= 0.5;
+          }
+          let nextOni = moveToward(oniPosRef.current, nextPlayer, oniSpeed);
+          if (stickyTrailRef.current.some((trail) => mapDistance(nextOni, trail) <= STICKY_RADIUS)) {
+            nextOni = oniPosRef.current;
+          }
+          const poopHit = poopTrapsRef.current.some((trap) => mapDistance(nextOni, trap) <= TRAP_RADIUS);
+          if (poopHit) {
+            oniFrozenUntilRef.current = now + STUN_MS;
+          }
           oniPosRef.current = nextOni;
           setOniPos(nextOni);
 
-          if (mapDistance(nextOni, nextPlayer) < catchRadiusRef.current) {
+          if (invincibleUntilRef.current <= now && mapDistance(nextOni, nextPlayer) < catchRadiusRef.current) {
             setPhase('lose');
             phaseRef.current = 'lose';
             return;
           }
         }
 
-        const nextMinions = minionPosRef.current.map((pos, i) =>
-          moveToward(pos, nextPlayer, minionSpeedsRef.current[i] ?? minionSpeedsRef.current[0]),
-        );
+        const nextMinions = minionPosRef.current.map((pos, i) => {
+          if ((minionFrozenUntilRef.current[i] ?? 0) > now) return pos;
+          let speed = minionSpeedsRef.current[i] ?? minionSpeedsRef.current[0] ?? oniSpeedRef.current;
+          if (slowAuraUntilRef.current > now && mapDistance(pos, nextPlayer) <= AURA_RADIUS) {
+            speed *= 0.5;
+          }
+          let next = moveToward(pos, nextPlayer, speed);
+          if (stickyTrailRef.current.some((trail) => mapDistance(next, trail) <= STICKY_RADIUS)) {
+            next = pos;
+          }
+          const poopHit = poopTrapsRef.current.some((trap) => mapDistance(next, trap) <= TRAP_RADIUS);
+          if (poopHit) {
+            minionFrozenUntilRef.current[i] = now + STUN_MS;
+          }
+          return next;
+        });
         minionPosRef.current = nextMinions;
         setMinionPositions(nextMinions);
 
         for (const minionPos of nextMinions) {
-          if (mapDistance(minionPos, nextPlayer) < catchRadiusRef.current) {
+          if (invincibleUntilRef.current <= now && mapDistance(minionPos, nextPlayer) < catchRadiusRef.current) {
             setPhase('lose');
             phaseRef.current = 'lose';
             return;
@@ -605,6 +877,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   }, [phase, roundLocked]);
 
   const playerStep = stepFromMotion(isMoving, animFrame);
+  const playerDir = lastDirRef.current;
   const oniStep = oniActive ? stepFromMotion(true, animFrame) : 'idle';
   const oniDir: CharDirection = oniPos
     ? directionFromVector(playerPos.x - oniPos.x, playerPos.y - oniPos.y)
@@ -699,6 +972,21 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
           <PlayerStatus />
 
           <div className="adventure-hud">
+            <button
+              type="button"
+              className={`adventure-skill-btn ${skillReady ? '' : 'is-cooling'}`.trim()}
+              onClick={activateSkill}
+              disabled={!skillReady}
+              title={skill.description}
+            >
+              <span className="adventure-skill-btn-label">必殺技</span>
+              <strong>{skill.name}</strong>
+              {!skillReady && (
+                <span className="adventure-skill-btn-cd">
+                  {Math.max(1, Math.ceil((skillCooldownUntil - nowMs()) / 1000))}s
+                </span>
+              )}
+            </button>
             <div
               className={`adventure-goal-banner${
                 playIntro === 'goal-reveal' ? ' adventure-goal-banner--reveal' : ''
@@ -805,6 +1093,14 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                       </div>
                       );
                     })}
+                    {poopTraps.map((trap, index) => (
+                      <div key={`poop-${index}`} className="adventure-poop-trap" style={{ left: trap.x, top: trap.y }}>
+                        💩
+                      </div>
+                    ))}
+                    {stickyTrail.map((trail, index) => (
+                      <div key={`slime-${index}`} className="adventure-sticky-trail" style={{ left: trail.x, top: trail.y }} />
+                    ))}
                     {oniActive && oniPos && !oniIntro && (
                       <MapCharacterSprite
                         x={oniPos.x}
@@ -845,7 +1141,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
                 y={charSize / 2}
                 size={charSize}
                 imageSrc={getAvatarFallbackSrc(chosenAvatar)}
-                direction="down"
+                direction={playerDir}
                 step={playerStep}
                 className="map-char--player"
                 interactive={playIntro === 'playing'}
@@ -853,6 +1149,10 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
               />
             </div>
           )}
+          {invincibleUntil > nowMs() && <div className="adventure-skill-ring" aria-hidden />}
+          {slowAuraUntil > nowMs() && <div className="adventure-skill-aura" aria-hidden />}
+          {waterSprayUntil > nowMs() && <div className={`adventure-skill-fan water dir-${playerDir}`} aria-hidden />}
+          {fireSprayUntil > nowMs() && <div className={`adventure-skill-fan fire dir-${playerDir}`} aria-hidden />}
           {playIntro === 'playing' && (
             <p className="adventure-touch-hint">👆 アバターをつかんでスライド</p>
           )}

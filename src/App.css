@@ -2864,6 +2864,42 @@ html.boss-no-select .scribble-kanji-input {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
+.adventure-skill-btn {
+  flex: 0 0 auto;
+  min-width: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.05rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.24);
+}
+
+.adventure-skill-btn.is-cooling {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  box-shadow: none;
+}
+
+.adventure-skill-btn-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+.adventure-skill-btn strong {
+  font-size: 0.88rem;
+  line-height: 1.1;
+}
+
+.adventure-skill-btn-cd {
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
 .adventure-top-panel {
   flex-shrink: 0;
   display: flex;
@@ -3134,6 +3170,24 @@ html.boss-no-select .scribble-kanji-input {
   overflow: hidden;
 }
 
+.adventure-poop-trap {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 1.55rem;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.adventure-sticky-trail {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.78) 0%, rgba(126, 34, 206, 0.48) 55%, rgba(126, 34, 206, 0) 72%);
+  z-index: 1;
+}
+
 .adventure-capital-marker {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -3384,6 +3438,60 @@ html.boss-no-select .scribble-kanji-input {
   transform: translate(-50%, -50%);
   z-index: 6;
   pointer-events: none;
+}
+
+.adventure-skill-ring,
+.adventure-skill-aura,
+.adventure-skill-fan {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.adventure-skill-ring {
+  width: 110px;
+  height: 110px;
+  transform: translate(-50%, -50%);
+  border: 4px solid rgba(253, 224, 71, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 0 6px rgba(253, 224, 71, 0.18);
+}
+
+.adventure-skill-aura {
+  width: 220px;
+  height: 220px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.22) 0%, rgba(74, 222, 128, 0.16) 55%, rgba(74, 222, 128, 0) 72%);
+}
+
+.adventure-skill-fan {
+  width: 220px;
+  height: 160px;
+  transform: translate(-50%, -50%);
+  clip-path: polygon(50% 50%, 100% 12%, 100% 88%);
+}
+
+.adventure-skill-fan.water {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0) 0%, rgba(56, 189, 248, 0.5) 35%, rgba(2, 132, 199, 0.88) 100%);
+}
+
+.adventure-skill-fan.fire {
+  background: linear-gradient(90deg, rgba(251, 146, 60, 0) 0%, rgba(251, 146, 60, 0.45) 35%, rgba(239, 68, 68, 0.92) 100%);
+}
+
+.adventure-skill-fan.dir-left {
+  transform: translate(-50%, -50%) scaleX(-1);
+}
+
+.adventure-skill-fan.dir-up {
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+.adventure-skill-fan.dir-down {
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 
 .adventure-player-pin .map-char {
