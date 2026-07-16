@@ -30,8 +30,9 @@ export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
  */
 export function adventurePhoneScale(viewportW: number, viewportH: number): number {
   const shortSide = Math.min(viewportW, viewportH);
-  if (shortSide > 0 && shortSide < 500) return 0.36; // iPhone / 縦持ちスマホ
-  if (shortSide < 700) return 0.7; // 小さめタブレット
+  // 大きいほどマップ拡大（キャラサイズは別制御）
+  if (shortSide > 0 && shortSide < 500) return 0.5; // iPhone / 縦持ちスマホ
+  if (shortSide < 700) return 0.75; // 小さめタブレット
   return 1;
 }
 
