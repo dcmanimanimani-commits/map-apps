@@ -28,12 +28,15 @@ export const ADVENTURE_WORLD_SCALE_H = 5.5 * ADVENTURE_ZOOM;
  * 画面に約1地方が入るようワールドを拡大。
  * スマホはワールドを小さくしてズームアウト＝映る範囲を広げ、鬼の接近を早めに見えるようにする。
  */
-export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
+export function adventurePhoneScale(viewportW: number, viewportH: number): number {
   const shortSide = Math.min(viewportW, viewportH);
-  // 小さいほどズームアウト（映る範囲が広い）
-  let phoneScale = 1;
-  if (shortSide > 0 && shortSide < 500) phoneScale = 0.36; // iPhone / 縦持ちスマホ
-  else if (shortSide < 700) phoneScale = 0.7; // 小さめタブレット
+  if (shortSide > 0 && shortSide < 500) return 0.36; // iPhone / 縦持ちスマホ
+  if (shortSide < 700) return 0.7; // 小さめタブレット
+  return 1;
+}
+
+export function buildWorldSize(viewportW: number, viewportH: number): { width: number; height: number } {
+  const phoneScale = adventurePhoneScale(viewportW, viewportH);
   return {
     width: Math.round(viewportW * ADVENTURE_WORLD_SCALE_W * phoneScale),
     height: Math.round(viewportH * ADVENTURE_WORLD_SCALE_H * phoneScale),

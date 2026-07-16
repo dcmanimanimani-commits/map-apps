@@ -8,6 +8,7 @@ import { BOSS_IMAGE, type AvatarLevel } from '../data/characterAssets';
 import { resolveAvatarLevel } from '../data/progress';
 import { AdventureAvatarSelect } from './AdventureAvatarSelect';
 import {
+  adventurePhoneScale,
   buildPrefectureCapitalPositions,
   buildWorldSize,
   clampToMap,
@@ -39,10 +40,10 @@ interface AvatarAdventureGameProps {
 type Phase = 'pick-avatar' | 'intro' | 'play' | 'win' | 'lose';
 type PlayIntro = 'goal-reveal' | 'oni-reveal' | 'playing';
 
-const ONI_SPEED = 3.78; // 旧5.4の0.7倍
+/** デスクトップ基準。iPhoneはマップ縮尺分をさらに掛けて体感速度を揃える */
+const ONI_SPEED_BASE = 2.646; // 5.4 × 0.7 × 0.7
 const MINION_COUNT = 10;
-/** 小さい鬼は大王よりゆっくり（とことこ）／全体0.7倍 */
-const MINION_SPEEDS = [2.016, 2.184, 2.352, 2.52, 2.688, 2.856, 3.024, 3.192, 3.36, 3.528] as const;
+const MINION_SPEEDS_BASE = [1.411, 1.529, 1.646, 1.764, 1.882, 1.999, 2.117, 2.234, 2.352, 2.470] as const;
 const ONI_INTRO_MS = 1000;
 const GOAL_REVEAL_MS = 8000;
 const ARRIVE_RADIUS_BASE = 48;
@@ -240,6 +241,8 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
   const viewSizeRef = useRef({ width: viewW, height: viewH });
   const arriveRadiusRef = useRef(ARRIVE_RADIUS_BASE);
   const catchRadiusRef = useRef(CATCH_RADIUS_BASE);
+  const oniSpeedRef = useRef(ONI_SPEED_BASE);
+  const minionSpeedsRef = useRef<readonly number[]>(MINION_SPEEDS_BASE);
   const geoRef = useRef(geo);
 
   playerPosRef.current = playerPos;
@@ -348,6 +351,11 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
     viewSizeRef.current = { width: vw, height: vh };
     arriveRadiusRef.current = interactionRadius(vw, vh, ARRIVE_RADIUS_BASE);
     catchRadiusRef.current = interactionRadius(vw, vh, CATCH_RADIUS_BASE);
+
+    // iPhoneはワールドが小さいので、同じ数値だと鬼が異常に速く見える → 縮尺で補正
+    const phoneScale = adventurePhoneScale(vw, vh);
+    oniSpeedRef.current = ONI_SPEED_BASE * phoneScale;
+    minionSpeedsRef.current = MINION_SPEEDS_BASE.map((s) => s * phoneScale);
 
     const roundCapitals = buildPrefectureCapitalPositions(
       geoRef.current,
@@ -552,7 +560,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
 
       if (oniActiveRef.current && !oniChasePausedRef.current) {
         if (oniPosRef.current) {
-          const nextOni = moveToward(oniPosRef.current, nextPlayer, ONI_SPEED);
+          const nextOni = moveToward(oniPosRef.current, nextPlayer, oniSpeedRef.current);
           oniPosRef.current = nextOni;
           setOniPos(nextOni);
 
@@ -564,7 +572,7 @@ export function AvatarAdventureGame({ geo, onBack }: AvatarAdventureGameProps) {
         }
 
         const nextMinions = minionPosRef.current.map((pos, i) =>
-          moveToward(pos, nextPlayer, MINION_SPEEDS[i] ?? MINION_SPEEDS[0]),
+          moveToward(pos, nextPlayer, minionSpeedsRef.current[i] ?? minionSpeedsRef.current[0]),
         );
         minionPosRef.current = nextMinions;
         setMinionPositions(nextMinions);
